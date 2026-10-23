@@ -309,6 +309,8 @@ class StudioWorkflow:
         voice_id: str | None = None,
         duration_sec: float = 15.0,
         sfx_enabled: bool = True,
+        motion_profile: str | None = None,
+        motion_intensity: float = 1.0,
     ) -> dict[str, Any]:
         # Rendering is deterministic and free of further AI calls. An explicit
         # image approval gate prevents automatic publishing of unreviewed art.
@@ -326,11 +328,17 @@ class StudioWorkflow:
             voice_path = str(self.store.media_path("voice", voice_id))
 
         from services.engine.renderer import PuzzleVideoRenderer, RenderConfig
+        from services.engine.motion_profiles import MOTION_PROFILES
         from services.engine.qa_validator import validate_rendered_video
 
         key = uuid.uuid4().hex
         brief = plan["brief"]
         creative = plan["plan"]
+        selected_motion = motion_profile or creative.get("motion_profile", "orbit_lock")
+        if selected_motion not in MOTION_PROFILES:
+            raise ValueError("Unsupported motion profile: " + str(selected_motion))
+        if not 0.0 <= motion_intensity <= 2.0:
+            raise ValueError("Motion intensity must be in the range 0 to 2")
         renderer = PuzzleVideoRenderer(
             assets_root=self.store.root / "assets",
             outputs_root=self.store.root / "renders",
@@ -349,6 +357,8 @@ class StudioWorkflow:
             offset_distance_px=int(creative.get("offset_distance_px", 165)),
             hold_ratio=float(creative.get("hold_ratio", 0.14)),
             object_count=int(creative.get("object_count", 5)),
+            motion_profile=selected_motion,
+            motion_intensity=motion_intensity,
         )
         artifact = renderer.render_video(configuration)
         qa = validate_rendered_video(
@@ -366,6 +376,8 @@ class StudioWorkflow:
             "image_id": image_id,
             "voice_id": voice_id,
             "sfx_enabled": sfx_enabled,
+            "motion_profile": selected_motion,
+            "motion_intensity": motion_intensity,
             "status": "READY_FOR_REVIEW",
             "created_at": utc_now(),
             "qa": {"passed": qa.passed, "duration_sec": qa.duration_sec, "codec": qa.video_codec},
