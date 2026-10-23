@@ -139,7 +139,10 @@ def validate_rendered_video(
 
     # Inspect first 45 consecutive frames + last frame for blank frames, jumps, and loop continuity
     import shutil
-    tmp_probe = Path("/tmp/aprf_qa_probe.mp4")
+    import tempfile
+    import uuid
+    # Never reuse a global temporary filename: concurrent QA jobs race.
+    tmp_probe = Path(tempfile.gettempdir()) / f"aprf_qa_probe_{uuid.uuid4().hex}.mp4"
     shutil.copy2(path, tmp_probe)
     cap = cv2.VideoCapture(str(tmp_probe))
     blank_frames = 0
@@ -163,10 +166,17 @@ def validate_rendered_video(
             if diff > max_jump:
                 max_jump = diff
         prev_frame = small
-        last_frame = small
         sampled += 1
 
+    # Compare the actual last encoded frame, not the 45th sampled frame.
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if frame_count > 0:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, max(0, frame_count - 1))
+        end_ok, end_frame = cap.read()
+        if end_ok and end_frame is not None:
+            last_frame = cv2.resize(end_frame, (135, 240), interpolation=cv2.INTER_AREA).astype(np.float32)
     cap.release()
+    tmp_probe.unlink(missing_ok=True)
 
     loop_diff = 0.0
     if first_frame is not None and last_frame is not None:
