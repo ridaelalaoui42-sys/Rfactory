@@ -99,3 +99,25 @@ Alternative: native **Kotlin + Jetpack Compose**, using `/openapi.json` as an AP
 - Gemini speech/TTS: https://ai.google.dev/gemini-api/docs/speech-generation
 - Schema-controlled planning: https://ai.google.dev/gemini-api/docs/structured-output
 - Model catalog: https://ai.google.dev/gemini-api/docs/models
+
+## Gemini Free Tier: what actually works without billing
+
+As of October 23, 2026, Google's public pricing documentation lists free quota access for **Gemini 3.5 Flash-Lite planning** and **Gemini 3.8 Flash / Flash-Lite TTS**, subject to project rate limits. **Nano Banana / Gemini image-generation API requests have no free tier**; selecting an image model does not bypass the billing requirement.
+
+Consequently Rfactory now has a no-paid-image route:
+1. Use your Gemini free-tier key for storyboard planning and TTS.
+2. Import an original/licensed PNG/JPEG/WebP through the Studio (or `POST /api/v1/ai/images/import`) instead of calling Nano Banana.
+3. The imported asset is alpha-segmented, validated and marked `AWAITING_APPROVAL`.
+4. Approve the asset, then render locally using the configured puzzle animation and narration.
+5. Keep control of ownership/provenance and never auto-post.
+
+To check your key **without embedding it in code, a public repo, or CI logs**:
+
+```bash
+python -m scripts.check_gemini_key
+```
+
+The script reads the key from `GEMINI_API_KEY` or a hidden terminal prompt, makes a single `models.list` request to Google's official Gemini endpoint, then prints only status and listed model names. It does not generate billable media. A successful listing is *not* proof an account has paid image generation enabled. Do not paste keys in the browser or commit them.
+
+Official pricing: https://ai.google.dev/gemini-api/docs/pricing
+
