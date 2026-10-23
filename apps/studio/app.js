@@ -118,6 +118,10 @@
     const creative = state.plan.plan;
     byId("plan-title").textContent = creative.title;
     byId("plan-hook").textContent = creative.hook;
+    byId("motion-direction").textContent =
+      "AI motion design: " + (creative.motion_note || "Seamless puzzle motion") +
+      " · " + (creative.cycles || 5) + " cycles · " +
+      (creative.offset_distance_px || 165) + "px movement";
     byId("image-prompt").value = creative.image_prompt;
     byId("voice-script").value = creative.narration;
     byId("storyboard-panel").hidden = false;
