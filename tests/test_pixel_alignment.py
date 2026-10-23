@@ -7,6 +7,7 @@ import numpy as np
 
 from services.engine.precision_qa import (
     audit_video_every_frame, exact_cutout_match, extract_canonical_piece,
+    audit_against_expected_frames,
 )
 
 
@@ -58,6 +59,40 @@ class PixelExactPuzzleTests(unittest.TestCase):
             writer.release()
             with self.assertRaises(AssertionError):
                 audit_video_every_frame(path,expected_frames=10,min_frame_std=10)
+
+
+    def test_every_decoded_frame_matches_source_and_detects_drift(self):
+        # The old QA checked only frame 0..44 and the final frame. Deliberately
+        # corrupt a middle-frame EXPECTATION: an actual match detector must fail.
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "reference.avi"
+            rng = np.random.default_rng(13)
+            rgb = rng.integers(35, 210, (320, 180, 3), dtype=np.uint8)
+            writer = cv2.VideoWriter(
+                str(out), cv2.VideoWriter_fourcc(*"MJPG"), 10, (180, 320)
+            )
+            self.assertTrue(writer.isOpened())
+            for _ in range(12):
+                writer.write(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+            writer.release()
+
+            report = audit_against_expected_frames(
+                out, expected_frame=lambda idx: rgb, expected_frames=12,
+                max_frame_mae=25.0, max_average_mae=15.0,
+                sample_wh=(90, 160),
+            )
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["frames_checked"], 12)
+
+            def wrong_reference(index):
+                return np.roll(rgb, 70, axis=1) if index == 7 else rgb
+
+            with self.assertRaises(AssertionError):
+                audit_against_expected_frames(
+                    out, expected_frame=wrong_reference, expected_frames=12,
+                    max_frame_mae=25.0, max_average_mae=15.0,
+                    sample_wh=(90, 160),
+                )
 
     def test_full_video_checks_frame_count(self):
         with tempfile.TemporaryDirectory() as tmp:
