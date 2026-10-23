@@ -11,3 +11,6 @@ pydantic>=2.9,<3
 # Playwright is deliberately NOT installed here: this release only has a
 # browser-state simulator, not a working Playwright integration.
 # Add playwright with tested locators/browser provisioning when implementing it.
+
+# Authenticated mobile/gallery image uploads
+python-multipart>=0.0.12,<1
