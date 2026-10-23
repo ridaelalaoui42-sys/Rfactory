@@ -52,6 +52,7 @@ class RenderRequest(BaseModel):
     image_id: str
     voice_id: str | None = None
     duration_sec: float = Field(default=15.0, ge=8, le=30)
+    sfx_enabled: bool = True
 
 
 def _run(op):
@@ -110,7 +111,7 @@ def approve_image(image_id: str, store: StudioStore = Depends(get_store)):
 
 @router.post("/renders", status_code=201)
 def render_reel(req: RenderRequest, workflow: StudioWorkflow = Depends(get_workflow)):
-    return _run(lambda: workflow.render(req.plan_id, req.image_id, req.voice_id, req.duration_sec))
+    return _run(lambda: workflow.render(req.plan_id, req.image_id, req.voice_id, req.duration_sec, req.sfx_enabled))
 
 
 @router.get("/library")
