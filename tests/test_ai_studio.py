@@ -115,6 +115,21 @@ class AICreativeStudioTests(unittest.TestCase):
         self.assertEqual(approved["status"], "APPROVED")
         self.assertTrue(self.store.media_path("image", art["id"]).is_file())
 
+    def test_edit_image_with_reference_keeps_provenance_and_reapproval(self):
+        plan = self.workflow.plan(self.brief)
+        original = self.workflow.image(ImageBrief(prompt=PLAN.image_prompt), plan["id"])
+        self.store.approve_image(original["id"])
+        modified = self.workflow.image(
+            ImageBrief(prompt="Enhance the rich golden fur and subtle premium highlights"),
+            plan["id"], source_image_id=original["id"]
+        )
+        self.assertNotEqual(original["id"], modified["id"])
+        self.assertEqual(modified["source_image_id"], original["id"])
+        self.assertEqual(modified["status"], "AWAITING_APPROVAL")
+        parts = self.fake.calls[-1]["input"]
+        self.assertEqual(parts[1]["type"], "image")
+        self.assertEqual(parts[1]["mime_type"], "image/png")
+
     def test_tts_wav_and_real_voice_video(self):
         plan = self.workflow.plan(self.brief)
         art = self.workflow.image(ImageBrief(prompt=PLAN.image_prompt), plan["id"])
@@ -140,6 +155,15 @@ class AICreativeStudioTests(unittest.TestCase):
             self.workflow.plan(self.brief)
             with self.assertRaises(BudgetExceeded):
                 self.workflow.plan(self.brief)
+
+    def test_mobile_studio_static_page_is_served(self):
+        with TestClient(app) as client:
+            res = client.get("/studio")
+            self.assertEqual(res.status_code, 200)
+            self.assertIn("AI Creative Studio", res.text)
+            res2 = client.get("/studio-static/app.js")
+            self.assertEqual(res2.status_code, 200)
+            self.assertIn("/api/v1/ai", res2.text)
 
     def test_versioned_api_requires_token_and_preserves_contract(self):
         app.dependency_overrides[get_store] = lambda: self.store
