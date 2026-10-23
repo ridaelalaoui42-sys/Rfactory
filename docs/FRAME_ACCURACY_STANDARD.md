@@ -25,9 +25,13 @@ said nothing about semantic puzzle correctness.
    validated binary alpha mask. Record crop bounds and a hash of the parent art.
 3. **Create the hole by removing those same masked pixels**, never by painting
    an independently imagined silhouette or inserting a separate swatch.
-4. **Animate only the tile's integer position.** Do not independently zoom,
-   rotate, resize or recolor the piece relative to the target, unless the
-   inverse transform is exactly reproduced at the snap pose.
+4. **Move the tile creatively while keeping the solved pose lossless.**
+   Rotate, orbit, swing, spiral, bounce or perspective-flip the *same source*
+   pixels in flight. At the snap frame, pose must be exactly
+   `dx=0, dy=0, angle=0°, scale_x=scale_y=1`; bypass all resampling and
+   blit the canonical source piece at its original integer pixel coordinate.
+   The animation itself is allowed to look playful, but the answer is not
+   approximate.
 5. **Pre-encode QA:** overlay the exact source pixels at target and assert
    mean absolute RGB difference `0.0` over the canonical image.
 6. **Hold a solved alignment state** for a visible ending. Verify every snap
@@ -79,3 +83,29 @@ decodes in full and passes the frame-integrity checks. For missing-piece and
 slice puzzles, also require exact reconstruction on the raw frame at the final
 alignment pose. Keep failed videos accessible to operators as
 `FAILED_QA` with details, not as successfully published content.
+
+
+## Cinematic Motion Director v3
+
+- `services/engine/motion_profiles.py` adds **eight distinct motion modes**:
+  `slide`, `spin_snap`, `orbit_lock`, `pendulum`, `spiral`,
+  `elastic`, `flip_reveal`, `zigzag`.
+- All four existing puzzle templates apply the chosen motion to their exact
+  canonical pieces. In a three-band puzzle, the bands receive different seeds.
+- Gemini can now suggest a mode through structured `CreativePlan.motion_profile`.
+  The dashboard exposes explicit override plus intensity controls for artists.
+- Batch campaigns cycle deterministic patterns rather than always generating
+  identical translation trajectories.
+- `renderer.py` compares **all decoded frames** of the finished MP4 with
+  its corresponding expected pre-encode frame and writes
+  `<video>.frameqa.json`. Failed QA blocks delivery.
+- `tests/test_motion_profiles.py` verifies lossless snap, distinct paths,
+  intensity safety and three real encoded rotating/spiraling/flip examples.
+- Three independent demonstration Reels were rendered using orbit (turtle),
+  swing (cow), and spiral-spin-flip (macaw). All 1080 video frames
+  (360 per Reel) matched their source animation within H.264 tolerances,
+  and all 81 lossless solved frames per video reconstructed the canonical art.
+
+A client can later expose exactly the same motion modes in Android using the
+versioned `/api/v1/ai/renders` request: `motion_profile` and
+`motion_intensity`. No renderer code runs inside the phone.
