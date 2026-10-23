@@ -130,6 +130,29 @@ class AICreativeStudioTests(unittest.TestCase):
         self.assertEqual(parts[1]["type"], "image")
         self.assertEqual(parts[1]["mime_type"], "image/png")
 
+    def test_free_tier_upload_from_device_requires_approval(self):
+        plan = self.workflow.plan(self.brief)
+        with TestClient(app) as client:
+            app.dependency_overrides[get_store] = lambda: self.store
+            app.dependency_overrides[get_workflow] = lambda: self.workflow
+            self.addCleanup(app.dependency_overrides.clear)
+            headers = {"Authorization": "Bearer test-backend-bearer"}
+            res = client.post("/api/v1/ai/images/import",
+                              headers=headers,
+                              data={"plan_id": plan["id"]},
+                              files={"file": ("original-fox.png", png_subject(), "image/png")})
+            self.assertEqual(res.status_code, 201, res.text)
+            uploaded = res.json()
+            self.assertEqual(uploaded["provider"], "user_upload")
+            self.assertEqual(uploaded["status"], "AWAITING_APPROVAL")
+            self.assertTrue(uploaded["qa"]["qa_passed"])
+            bad = client.post("/api/v1/ai/images/import", headers=headers,
+                              files={"file": ("document.txt", b"not an image", "text/plain")})
+            self.assertEqual(bad.status_code, 415)
+            approved = client.post("/api/v1/ai/images/" + uploaded["id"] + "/approve",
+                                   headers=headers)
+            self.assertEqual(approved.status_code, 200)
+
     def test_tts_wav_and_real_voice_video(self):
         plan = self.workflow.plan(self.brief)
         art = self.workflow.image(ImageBrief(prompt=PLAN.image_prompt), plan["id"])
