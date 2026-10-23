@@ -133,3 +133,78 @@ def audit_video_every_frame(
         "max_mean_frame_jump": round(largest_jump, 3),
         "passed": True,
     }
+
+def audit_against_expected_frames(
+    path: str | Path,
+    expected_frame,
+    expected_frames: int,
+    max_frame_mae: float = 12.0,
+    max_average_mae: float = 6.0,
+    sample_wh: tuple[int, int] = (270, 480),
+) -> dict[str, Any]:
+    """Decode EVERY frame and compare to the actual source-animation frame.
+
+    The expected_frame(index) callback must yield a uint8 RGB ndarray (H,W,3),
+    representing the video before lossy compression. This catches visual drift
+    and wrong-piece renders that ordinary container/fps checks cannot.
+    Tolerances account for H.264/YUV420 conversion (pixel-zero belongs to
+    lossless mask compositing, not encoded/decoded frames). No generated
+    content is inferred from the encoded video itself.
+    """
+    if expected_frames < 1 or expected_frames > 18000:
+        raise ValueError("expected_frames must be between 1 and 18000")
+    if not (0 < max_frame_mae <= 255) or not (0 < max_average_mae <= 255):
+        raise ValueError("MAE tolerances must be positive and <= 255")
+    capture = cv2.VideoCapture(str(path))
+    if not capture.isOpened():
+        raise ValueError("Video cannot be opened for reference QA")
+    worst = 0.0
+    worst_index = -1
+    sum_error = 0.0
+    frames = 0
+    try:
+        while True:
+            ok, decoded = capture.read()
+            if not ok:
+                break
+            if frames >= expected_frames:
+                raise AssertionError("Decoded more frames than expected")
+            reference = expected_frame(frames)
+            if not isinstance(reference, np.ndarray) or reference.ndim != 3:
+                raise ValueError("Reference callback must return RGB ndarray")
+            if reference.dtype != np.uint8 or reference.shape[2] != 3:
+                raise ValueError("Reference callback must return uint8 RGB")
+            # Match at a deterministic shared size for affordable full-video QA.
+            observed = cv2.cvtColor(decoded, cv2.COLOR_BGR2RGB)
+            reference_small = cv2.resize(reference, sample_wh, interpolation=cv2.INTER_AREA)
+            decoded_small = cv2.resize(observed, sample_wh, interpolation=cv2.INTER_AREA)
+            mae = float(np.mean(np.abs(
+                reference_small.astype(np.int16) -
+                decoded_small.astype(np.int16)
+            )))
+            if mae > worst:
+                worst, worst_index = mae, frames
+            if mae > max_frame_mae:
+                raise AssertionError(
+                    f"Frame {frames} deviates from reference: "
+                    f"MAE {mae:.3f} exceeds {max_frame_mae:.3f}"
+                )
+            sum_error += mae
+            frames += 1
+    finally:
+        capture.release()
+    if frames != expected_frames:
+        raise AssertionError(f"Decoded {frames}/{expected_frames} frames")
+    average = sum_error / frames
+    if average > max_average_mae:
+        raise AssertionError(
+            f"Mean decoded video MAE {average:.3f} exceeds {max_average_mae:.3f}"
+        )
+    return {
+        "frames_checked": frames,
+        "worst_frame": worst_index,
+        "worst_frame_mae": round(worst, 4),
+        "average_frame_mae": round(average, 4),
+        "source_pixels_exact": "verify separately with exact_cutout_match",
+        "passed": True,
+    }
