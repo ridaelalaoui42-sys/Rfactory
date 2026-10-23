@@ -66,6 +66,7 @@ class RenderConfig:
     motion_intensity: float = 1.0
     randomize_snap_timing: bool = True
     continuous_motion: bool = True  # exact matches are single crossing frames; no freeze
+    sound_mode: str = "match_only"  # sound at exact fit; no ticking or music
     snap_count: int = 0  # 0 = follow cycles; positive sets exact number of solves
 
 
@@ -199,6 +200,8 @@ class PuzzleVideoRenderer:
         start_t = time.time()
         if config.motion_profile not in MOTION_PROFILES:
             raise ValueError("Unsupported motion profile: " + config.motion_profile)
+        if config.sound_mode not in {"match_only", "music_and_ticks"}:
+            raise ValueError("Unsupported sound mode")
         if not 0.0 <= config.motion_intensity <= 2.0:
             raise ValueError("motion_intensity must be 0 to 2")
         w, h = config.width, config.height
@@ -573,7 +576,8 @@ class PuzzleVideoRenderer:
                 output_wav_path=wav_path,
                 duration_sec=config.duration_sec,
                 alignment_timestamps_sec=alignment_onsets_sec,
-                enable_music=True,
+                enable_music=config.sound_mode == "music_and_ticks",
+                enable_ticks=config.sound_mode == "music_and_ticks",
                 seed=config.seed,
             )
 
