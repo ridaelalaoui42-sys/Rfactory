@@ -24,11 +24,13 @@ from services.publisher.adapters import (
     MetaBusinessSuitePlaywrightPublisher,
 )
 from services.worker.batch_runner import BatchProductionWorker
+from services.api.ai_routes import router as ai_router
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 STORAGE_ROOT = REPO_ROOT / "storage"
 
-app = FastAPI(title="Animal Puzzle Reels Factory API", version="1.0.1")
+app = FastAPI(title="Animal Puzzle Reels Factory API", version="2.0.0")
+app.include_router(ai_router)
 
 
 @app.middleware("http")
