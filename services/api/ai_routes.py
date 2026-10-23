@@ -113,6 +113,16 @@ def render_reel(req: RenderRequest, workflow: StudioWorkflow = Depends(get_workf
     return _run(lambda: workflow.render(req.plan_id, req.image_id, req.voice_id, req.duration_sec))
 
 
+@router.get("/library")
+def list_library(
+    kind: Literal["plan", "image", "voice", "render"] = "plan",
+    limit: int = 20,
+    offset: int = 0,
+    store: StudioStore = Depends(get_store),
+):
+    return _run(lambda: store.list_records(kind, limit=limit, offset=offset))
+
+
 @router.get("/records/{kind}/{asset_id}")
 def record(kind: Literal["plan", "image", "voice", "render"], asset_id: str, store: StudioStore = Depends(get_store)):
     return _run(lambda: store.read_metadata(kind, asset_id))
