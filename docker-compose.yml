@@ -13,6 +13,9 @@ services:
       SQLITE_DB_PATH: /app/storage/factory.db
       BROWSER_AUTOMATION_ENABLED: "false"
       LIVE_PUBLISH_ENABLED: "false"
+      RFACTORY_AI_ENABLED: ${RFACTORY_AI_ENABLED:-false}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      RFACTORY_AI_DAILY_CALL_LIMIT: ${RFACTORY_AI_DAILY_CALL_LIMIT:-20}
     volumes:
       - rfactory_data:/app/storage
     healthcheck:
