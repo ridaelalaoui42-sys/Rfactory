@@ -182,6 +182,20 @@ def validate_rendered_video(
     if first_frame is not None and last_frame is not None:
         loop_diff = float(np.mean(np.abs(first_frame - last_frame)))
 
+    # Full-duration decoded frame review is mandatory for every READY video.
+    # Earlier versions sampled only the first 45 frames, missing late artifacts.
+    from services.engine.precision_qa import audit_video_every_frame
+    try:
+        coverage = audit_video_every_frame(
+            path,
+            expected_frames=int(round(expected_duration_sec * expected_fps)),
+            max_mean_jump=45.0,
+        )
+        checks["all_frames_decodable"] = bool(coverage["passed"])
+    except (AssertionError, ValueError, OSError) as exc:
+        checks["all_frames_decodable"] = False
+        errors.append(f"Frame-by-frame video validation failed: {exc}")
+
     checks["no_blank_frames"] = blank_frames == 0 and sampled > 0
     if not checks["no_blank_frames"]:
         errors.append(f"Blank or unreadable frames detected ({blank_frames})")
