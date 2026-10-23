@@ -76,7 +76,7 @@ class CinematicMotionTests(unittest.TestCase):
                     hold_ratio=0.18, motion_intensity=1.0,
                 )
                 artifact = renderer.render_video(config)
-                self.assertGreater(len(artifact.alignment_frames), 3)
+                self.assertEqual(len(artifact.alignment_frames), 1)
                 self.assertAlmostEqual(artifact.pixel_match_mad, 0.0)
                 report = validate_rendered_video(
                     artifact.mp4_path, expected_duration_sec=2.0,
