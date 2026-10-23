@@ -314,7 +314,10 @@ class StudioWorkflow:
             duration_sec=duration_sec,
             background_hex=creative["background_hex"],
             enable_audio=sfx_enabled,
-            cycles=5,
+            cycles=int(creative.get("cycles", 5)),
+            offset_distance_px=int(creative.get("offset_distance_px", 165)),
+            hold_ratio=float(creative.get("hold_ratio", 0.14)),
+            object_count=int(creative.get("object_count", 5)),
         )
         artifact = renderer.render_video(configuration)
         qa = validate_rendered_video(
