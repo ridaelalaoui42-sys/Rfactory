@@ -27,6 +27,14 @@ jobs:
           cache: pip
       - name: Install runtime dependencies
         run: pip install -r requirements-dev.txt
+      - name: Verify modern Gemini SDK integration can initialize without network calls
+        run: |
+          pip install -r requirements-ai.txt
+          python -c "from google import genai; client = genai.Client(api_key='ci-test-placeholder'); assert hasattr(client, 'interactions'); client.close()"
+      - name: Check browser script syntax and PWA manifest
+        run: |
+          node --check apps/studio/app.js
+          python -m json.tool apps/studio/manifest.webmanifest > /dev/null
       - name: Install video codec tools
         run: |
           sudo apt-get update -qq
