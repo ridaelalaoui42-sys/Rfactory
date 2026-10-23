@@ -33,8 +33,8 @@ from services.assets.segmentation import (
     generate_outline_silhouette_rgba,
 )
 from services.assets.sound_fx import synthesize_puzzle_audio_wav
-from services.engine.motion_profiles import motion_pose, transformed_sprite, MOTION_PROFILES, MotionPose
-from services.engine.snap_timeline import build_snap_timeline
+from services.engine.motion_profiles import motion_pose, continuous_motion_pose, transformed_sprite, MOTION_PROFILES, MotionPose
+from services.engine.snap_timeline import build_snap_timeline, build_crossing_timeline
 
 
 @dataclass
@@ -65,6 +65,7 @@ class RenderConfig:
     motion_profile: str = "slide"
     motion_intensity: float = 1.0
     randomize_snap_timing: bool = True
+    continuous_motion: bool = True  # exact matches are single crossing frames; no freeze
     snap_count: int = 0  # 0 = follow cycles; positive sets exact number of solves
 
 
@@ -213,12 +214,17 @@ class PuzzleVideoRenderer:
             else min(cycles, max(1, total_frames // min_pass_frames))
         )
         timeline = (
-            build_snap_timeline(
+            (build_crossing_timeline if config.continuous_motion else build_snap_timeline)(
                 total_frames=total_frames, fps=fps, count=event_count,
                 seed=config.seed, hold_ratio=config.hold_ratio,
             )
             if config.randomize_snap_timing else None
         )
+        # Distinguish the new continuous trajectories from legacy pause
+        # animations without changing the old testable helper functions.
+        def _resolve_pose(*args, **kwargs):
+            provider = continuous_motion_pose if config.continuous_motion else motion_pose
+            return provider(*args, **kwargs)
         # Irregular windows require a unique full-length render rather than
         # looping the same short movie through FFmpeg.
         cycle_frames = total_frames if timeline else max(15, int(round(total_frames / float(cycles))))
@@ -308,7 +314,7 @@ class PuzzleVideoRenderer:
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
                 phase = phase_for_frame(c_idx)
                 if config.motion_profile != "slide" or timeline is not None:
-                    pose = motion_pose(config.motion_profile, phase, config.offset_distance_px,
+                    pose = _resolve_pose(config.motion_profile, phase, config.offset_distance_px,
                                        config.hold_ratio, config.seed, config.motion_intensity,
                                        "horizontal")
                     if c_idx in frame_cache:
@@ -316,7 +322,7 @@ class PuzzleVideoRenderer:
                         return encoded, cached, pose.locked
                     frame = static_base_rgb.copy()
                     for idx, (e_rgba, ex, ey, amp_f) in enumerate(egg_sprites):
-                        egg_pose = motion_pose(config.motion_profile, phase,
+                        egg_pose = _resolve_pose(config.motion_profile, phase,
                                                config.offset_distance_px * amp_f,
                                                config.hold_ratio, config.seed + idx + 1,
                                                config.motion_intensity, "horizontal")
@@ -366,7 +372,7 @@ class PuzzleVideoRenderer:
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
                 cycle_p = phase_for_frame(c_idx)
                 if config.motion_profile != "slide" or timeline is not None:
-                    pose = motion_pose(
+                    pose = _resolve_pose(
                         config.motion_profile, cycle_p,
                         max(220, config.offset_distance_px * 1.9),
                         config.hold_ratio, config.seed, config.motion_intensity,
@@ -434,7 +440,7 @@ class PuzzleVideoRenderer:
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
                 cycle_p = phase_for_frame(c_idx)
                 if config.motion_profile != "slide" or timeline is not None:
-                    pose = motion_pose(
+                    pose = _resolve_pose(
                         config.motion_profile, cycle_p,
                         max(220, config.offset_distance_px * 1.9),
                         config.hold_ratio, config.seed, config.motion_intensity,
@@ -498,16 +504,16 @@ class PuzzleVideoRenderer:
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
                 phase = phase_for_frame(c_idx)
                 if config.motion_profile != "slide" or timeline is not None:
-                    pose_top = motion_pose(config.motion_profile, phase,
+                    pose_top = _resolve_pose(config.motion_profile, phase,
                         config.offset_distance_px * 1.2, config.hold_ratio,
                         config.seed, config.motion_intensity, "horizontal")
                     if c_idx in frame_cache:
                         encoded, cached = frame_cache[c_idx]
                         return encoded, cached, pose_top.locked
-                    pose_mid = motion_pose(config.motion_profile, phase,
+                    pose_mid = _resolve_pose(config.motion_profile, phase,
                         config.offset_distance_px * 1.3, config.hold_ratio,
                         config.seed + 1, config.motion_intensity, "horizontal")
-                    pose_bot = motion_pose(config.motion_profile, phase,
+                    pose_bot = _resolve_pose(config.motion_profile, phase,
                         config.offset_distance_px, config.hold_ratio,
                         config.seed + 2, config.motion_intensity, "horizontal")
                     frame = static_base_rgb.copy()
@@ -542,7 +548,7 @@ class PuzzleVideoRenderer:
             if timeline is not None:
                 aligned = timeline.is_locked(f_idx)
             elif config.motion_profile != "slide":
-                aligned = motion_pose(config.motion_profile, c_idx / float(cycle_frames),
+                aligned = _resolve_pose(config.motion_profile, c_idx / float(cycle_frames),
                     config.offset_distance_px, config.hold_ratio, config.seed,
                     config.motion_intensity).locked
             elif config.template_id in ("OUTLINE_MATCH", "FACE_SPLIT_3BAND"):
@@ -695,6 +701,11 @@ class PuzzleVideoRenderer:
             snap_metadata["audio_snap_times_sec"] = alignment_onsets_sec
             if len(alignment_onsets_sec) != len(timeline.passes):
                 raise RuntimeError("Snap timeline did not produce the expected number of match events")
+            if config.continuous_motion:
+                if len(alignment_frames) != len(timeline.passes):
+                    raise RuntimeError("Continuous motion must have one exact-fit frame per pass")
+                if any(event.first_locked_frame != event.last_locked_frame for event in timeline.passes):
+                    raise RuntimeError("Continuous motion unexpectedly contains a hold window")
             mp4_path.with_suffix(".snaps.json").write_text(
                 json.dumps(snap_metadata, indent=2), encoding="utf-8"
             )
