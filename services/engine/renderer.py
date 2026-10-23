@@ -11,6 +11,7 @@ to render full 15s 1080x1920 @ 30fps H.264/AAC MP4s in ~2.5 seconds.
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import uuid
 import shutil
@@ -640,6 +641,27 @@ class PuzzleVideoRenderer:
         mux_res = subprocess.run(mux_cmd, capture_output=True, text=True, check=False)
         if mux_res.returncode != 0:
             raise RuntimeError(f"FFmpeg mux failed: {mux_res.stderr}")
+
+        # Exhaustive actual-vs-expected QA: check every encoded frame against
+        # its canonical pre-encode animation. This is stricter than 'decodable'.
+        # Any wrong-piece, desynchronized trajectory or codec corruption blocks
+        # the job BEFORE it can become READY or reach the publishing queue.
+        from services.engine.precision_qa import audit_against_expected_frames
+        frame_report = audit_against_expected_frames(
+            mp4_path,
+            expected_frame=lambda i: get_cycle_frame(i % cycle_frames)[1],
+            expected_frames=total_frames,
+            max_frame_mae=12.0,
+            max_average_mae=6.0,
+            sample_wh=(180, 320),
+        )
+        frame_report.update({
+            "motion_profile": config.motion_profile,
+            "motion_intensity": config.motion_intensity,
+            "snap_alignment_mad_uncompressed": pixel_match_mad,
+        })
+        frame_report_path = mp4_path.with_suffix(".frameqa.json")
+        frame_report_path.write_text(json.dumps(frame_report, indent=2), encoding="utf-8")
 
         if not saved_align_png and thumb_path.exists():
             Image.open(thumb_path).save(align_png_path)
