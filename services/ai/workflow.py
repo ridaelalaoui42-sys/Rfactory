@@ -277,6 +277,7 @@ class StudioWorkflow:
         image_id: str,
         voice_id: str | None = None,
         duration_sec: float = 15.0,
+        sfx_enabled: bool = True,
     ) -> dict[str, Any]:
         # Rendering is deterministic and free of further AI calls. An explicit
         # image approval gate prevents automatic publishing of unreviewed art.
@@ -312,14 +313,14 @@ class StudioWorkflow:
             seed=int(key[:8], 16),
             duration_sec=duration_sec,
             background_hex=creative["background_hex"],
-            enable_audio=not bool(voice_id),
+            enable_audio=sfx_enabled,
             cycles=5,
         )
         artifact = renderer.render_video(configuration)
         qa = validate_rendered_video(
             artifact.mp4_path,
             expected_duration_sec=duration_sec,
-            require_audio=True,
+            require_audio=bool(voice_id or sfx_enabled),
             missing_piece_mad=artifact.pixel_match_mad,
         )
         if not qa.passed:
@@ -330,6 +331,7 @@ class StudioWorkflow:
             "plan_id": plan_id,
             "image_id": image_id,
             "voice_id": voice_id,
+            "sfx_enabled": sfx_enabled,
             "status": "READY_FOR_REVIEW",
             "created_at": utc_now(),
             "qa": {"passed": qa.passed, "duration_sec": qa.duration_sec, "codec": qa.video_codec},
