@@ -311,6 +311,7 @@ class StudioWorkflow:
         sfx_enabled: bool = True,
         motion_profile: str | None = None,
         motion_intensity: float = 1.0,
+        snap_count: int = 0,
     ) -> dict[str, Any]:
         # Rendering is deterministic and free of further AI calls. An explicit
         # image approval gate prevents automatic publishing of unreviewed art.
@@ -339,6 +340,8 @@ class StudioWorkflow:
             raise ValueError("Unsupported motion profile: " + str(selected_motion))
         if not 0.0 <= motion_intensity <= 2.0:
             raise ValueError("Motion intensity must be in the range 0 to 2")
+        if not 0 <= snap_count <= 12:
+            raise ValueError("Snap count must be 0 (auto) or between 1 and 12")
         renderer = PuzzleVideoRenderer(
             assets_root=self.store.root / "assets",
             outputs_root=self.store.root / "renders",
@@ -359,6 +362,8 @@ class StudioWorkflow:
             object_count=int(creative.get("object_count", 5)),
             motion_profile=selected_motion,
             motion_intensity=motion_intensity,
+            randomize_snap_timing=True,
+            snap_count=snap_count,
         )
         artifact = renderer.render_video(configuration)
         qa = validate_rendered_video(
@@ -378,6 +383,8 @@ class StudioWorkflow:
             "sfx_enabled": sfx_enabled,
             "motion_profile": selected_motion,
             "motion_intensity": motion_intensity,
+            "snap_count": snap_count or int(creative.get("cycles", 5)),
+            "timing_mode": "seeded_irregular",
             "status": "READY_FOR_REVIEW",
             "created_at": utc_now(),
             "qa": {"passed": qa.passed, "duration_sec": qa.duration_sec, "codec": qa.video_codec},
