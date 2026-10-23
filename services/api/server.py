@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -31,6 +33,17 @@ STORAGE_ROOT = REPO_ROOT / "storage"
 
 app = FastAPI(title="Animal Puzzle Reels Factory API", version="2.0.0")
 app.include_router(ai_router)
+
+# Framework-neutral, mobile-first studio. Future Android clients share this
+# API while the UI can be packaged with Capacitor if desired.
+STUDIO_DIR = REPO_ROOT / "apps" / "studio"
+if STUDIO_DIR.is_dir():
+    app.mount("/studio-static", StaticFiles(directory=str(STUDIO_DIR)), name="studio-static")
+
+    @app.get("/studio", include_in_schema=False)
+    def ai_studio_home():
+        return FileResponse(STUDIO_DIR / "index.html")
+
 
 
 @app.middleware("http")
