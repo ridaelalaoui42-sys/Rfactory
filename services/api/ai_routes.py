@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -102,6 +102,25 @@ def generate_image(req: ImageRequest, workflow: StudioWorkflow = Depends(get_wor
 @router.post("/voices", status_code=201)
 def generate_voice(req: VoiceRequest, workflow: StudioWorkflow = Depends(get_workflow)):
     return _run(lambda: workflow.voice(VoiceBrief.model_validate(req.model_dump(exclude={"plan_id"})), req.plan_id))
+
+
+@router.post("/images/import", status_code=201)
+async def import_uploaded_image(
+    file: UploadFile = File(...),
+    plan_id: str | None = Form(None),
+    workflow: StudioWorkflow = Depends(get_workflow),
+):
+    """Import gallery artwork without a paid image-generation model.
+
+    Strict 10 MB limit, Pillow image validation, no arbitrary file paths.
+    User must have rights to imported artwork.
+    """
+    if file.content_type not in {"image/png", "image/jpeg", "image/webp"}:
+        raise HTTPException(status_code=415, detail="Upload PNG, JPEG or WebP")
+    blob = await file.read(10 * 1024 * 1024 + 1)
+    if len(blob) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Image exceeds 10 MB limit")
+    return _run(lambda: workflow.import_image(blob, plan_id))
 
 
 @router.post("/images/{image_id}/approve")
