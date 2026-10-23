@@ -204,7 +204,14 @@ class PuzzleVideoRenderer:
         fps = config.fps
         total_frames = int(round(config.duration_sec * fps))
         cycles = max(1, config.cycles)
-        event_count = config.snap_count if config.snap_count else cycles
+        # Auto mode adapts to short preview renders: each pass needs at least
+        # ~0.55s, but explicit snap_count requests must pass validation.
+        min_pass_frames = max(12, int(round(0.55 * fps)))
+        event_count = (
+            config.snap_count
+            if config.snap_count
+            else min(cycles, max(1, total_frames // min_pass_frames))
+        )
         timeline = (
             build_snap_timeline(
                 total_frames=total_frames, fps=fps, count=event_count,
