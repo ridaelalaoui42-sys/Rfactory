@@ -46,3 +46,7 @@ test-results/
 # System
 .DS_Store
 Thumbs.db
+
+# Generated AI workspaces (prompts, images, audio, metadata and API ledger)
+storage/ai/
+storage/assets/ai/
