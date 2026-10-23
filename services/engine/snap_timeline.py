@@ -108,3 +108,82 @@ def build_snap_timeline(
     if start != total_frames:
         raise AssertionError("Timeline does not cover the full video")
     return SnapTimeline(total_frames, fps, seed, hold_ratio, tuple(passes))
+
+# Continuous crossing mode: only one exact-fit frame per motion pass.
+# Keep build_snap_timeline for legacy projects, but new renders default here.
+@dataclass(frozen=True)
+class CrossingTimeline:
+    total_frames: int
+    fps: int
+    seed: int
+    passes: tuple[MotionPass, ...]
+
+    def _pass_for(self, frame: int) -> MotionPass:
+        if not 0 <= frame < self.total_frames:
+            raise IndexError(frame)
+        return self.passes[bisect.bisect_right(
+            [event.end_frame for event in self.passes], frame
+        )]
+
+    def phase(self, frame: int) -> float:
+        part = self._pass_for(frame)
+        cross = part.first_locked_frame
+        if frame <= cross:
+            return 0.5 * (frame - part.start_frame) / max(1, cross - part.start_frame)
+        return 0.5 + 0.5 * (frame - cross) / max(1, part.end_frame - 1 - cross)
+
+    def is_locked(self, frame: int) -> bool:
+        return frame == self._pass_for(frame).first_locked_frame
+
+    def snap_times(self) -> list[float]:
+        return [round(p.first_locked_frame / self.fps, 3) for p in self.passes]
+
+    def metadata(self) -> dict:
+        return {
+            "timing_mode": "seeded_irregular_continuous",
+            "continuous_motion": True,
+            "hold_frames_per_match": 1,
+            "fps": self.fps,
+            "seed": self.seed,
+            "total_frames": self.total_frames,
+            "snap_count": len(self.passes),
+            "snap_timestamps_sec": self.snap_times(),
+            "snap_windows": [asdict(p) for p in self.passes],
+        }
+
+
+def build_crossing_timeline(
+    total_frames: int,
+    fps: int,
+    count: int,
+    seed: int,
+    hold_ratio: float = 0.14,  # compatibility only; never used for dwell
+) -> CrossingTimeline:
+    """Create irregular, reproducible single-frame crossings with no hold."""
+    if not 12 <= total_frames <= 18000:
+        raise ValueError("Timeline must contain 12 to 18000 frames")
+    if not 1 <= fps <= 120 or not 1 <= count <= 12:
+        raise ValueError("Invalid frame rate or crossing count")
+    minimum = max(15, int(round(fps * 0.55)))
+    if total_frames < minimum * count:
+        raise ValueError("Too many crossings for the requested duration")
+    randomizer = random.Random(seed ^ 0xC1A70)
+    raw_weights = [randomizer.uniform(0.45, 1.75) for _ in range(count)]
+    available = total_frames - count * minimum
+    weight_sum = sum(raw_weights)
+    extra = [int(available * w / weight_sum) for w in raw_weights]
+    remainders = [available * w / weight_sum - n for w, n in zip(raw_weights, extra)]
+    for index in sorted(range(count), key=lambda idx: -remainders[idx])[:available - sum(extra)]:
+        extra[index] += 1
+    start = 0
+    events = []
+    for frames in extra:
+        end = start + minimum + frames
+        # The exact crossing frame is not forced into a repeated wall-clock
+        # grid; one central frame is snapped losslessly to the source.
+        match = start + (end - start - 1) // 2
+        events.append(MotionPass(start, end, match, match))
+        start = end
+    if start != total_frames:
+        raise AssertionError("Frame partition is not exhaustive")
+    return CrossingTimeline(total_frames, fps, seed, tuple(events))
