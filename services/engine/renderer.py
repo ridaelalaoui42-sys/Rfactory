@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import time
 from dataclasses import dataclass
+from collections import OrderedDict
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -33,6 +34,7 @@ from services.assets.segmentation import (
 )
 from services.assets.sound_fx import synthesize_puzzle_audio_wav
 from services.engine.motion_profiles import motion_pose, transformed_sprite, MOTION_PROFILES, MotionPose
+from services.engine.snap_timeline import build_snap_timeline
 
 
 @dataclass
@@ -62,6 +64,8 @@ class RenderConfig:
     safe_area_guides: bool = False
     motion_profile: str = "slide"
     motion_intensity: float = 1.0
+    randomize_snap_timing: bool = True
+    snap_count: int = 0  # 0 = follow cycles; positive sets exact number of solves
 
 
 @dataclass
@@ -83,6 +87,16 @@ class RenderArtifact:
     pixel_match_mad: float
     render_time_sec: float
     sha256: str
+
+
+class BoundedFrameCache(OrderedDict):
+    """Prevent multi-gigabyte frame cache when verifying entire timelines."""
+    def __setitem__(self, key, value):
+        if key in self:
+            del self[key]
+        super().__setitem__(key, value)
+        while len(self) > 5:
+            self.popitem(last=False)
 
 
 def hex_to_rgb(hex_str: str) -> Tuple[int, int, int]:
@@ -190,7 +204,19 @@ class PuzzleVideoRenderer:
         fps = config.fps
         total_frames = int(round(config.duration_sec * fps))
         cycles = max(1, config.cycles)
-        cycle_frames = max(15, int(round(total_frames / float(cycles))))
+        event_count = config.snap_count if config.snap_count else cycles
+        timeline = (
+            build_snap_timeline(
+                total_frames=total_frames, fps=fps, count=event_count,
+                seed=config.seed, hold_ratio=config.hold_ratio,
+            )
+            if config.randomize_snap_timing else None
+        )
+        # Irregular windows require a unique full-length render rather than
+        # looping the same short movie through FFmpeg.
+        cycle_frames = total_frames if timeline else max(15, int(round(total_frames / float(cycles))))
+        def phase_for_frame(idx: int) -> float:
+            return timeline.phase(idx) if timeline is not None else idx / float(cycle_frames)
         bg_rgb = hex_to_rgb(config.background_hex)
 
         job_dir = self.outputs_root / config.job_id
@@ -231,7 +257,7 @@ class PuzzleVideoRenderer:
         vignette = np.clip(1.0 - 0.035 * (xx * xx + yy * yy), 0.94, 1.0)[:, :, None]
         static_base_rgb = (static_base_rgb.astype(np.float32) * vignette).astype(np.uint8)
 
-        frame_cache: Dict[int, Tuple[bytes, np.ndarray]] = {}
+        frame_cache: Dict[int, Tuple[bytes, np.ndarray]] = BoundedFrameCache()
 
         if config.template_id == "OUTLINE_MATCH":
             animal_w, animal_h = 720, 640
@@ -273,8 +299,8 @@ class PuzzleVideoRenderer:
                 egg_sprites.append((e_rgba, ex, ey, amp_factor))
 
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
-                phase = c_idx / float(cycle_frames)
-                if config.motion_profile != "slide":
+                phase = phase_for_frame(c_idx)
+                if config.motion_profile != "slide" or timeline is not None:
                     pose = motion_pose(config.motion_profile, phase, config.offset_distance_px,
                                        config.hold_ratio, config.seed, config.motion_intensity,
                                        "horizontal")
@@ -331,8 +357,8 @@ class PuzzleVideoRenderer:
             target_py = animal_y + mp_bundle.alignment_target_xy[1]
 
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
-                cycle_p = c_idx / float(cycle_frames)
-                if config.motion_profile != "slide":
+                cycle_p = phase_for_frame(c_idx)
+                if config.motion_profile != "slide" or timeline is not None:
                     pose = motion_pose(
                         config.motion_profile, cycle_p,
                         max(220, config.offset_distance_px * 1.9),
@@ -399,8 +425,8 @@ class PuzzleVideoRenderer:
             target_py = face_y + horiz_bundle.alignment_target_xy[1]
 
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
-                cycle_p = c_idx / float(cycle_frames)
-                if config.motion_profile != "slide":
+                cycle_p = phase_for_frame(c_idx)
+                if config.motion_profile != "slide" or timeline is not None:
                     pose = motion_pose(
                         config.motion_profile, cycle_p,
                         max(220, config.offset_distance_px * 1.9),
@@ -463,8 +489,8 @@ class PuzzleVideoRenderer:
             tx_bot, ty_bot = face_x + band3.band_targets_xy[2][0], face_y + band3.band_targets_xy[2][1]
 
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
-                phase = c_idx / float(cycle_frames)
-                if config.motion_profile != "slide":
+                phase = phase_for_frame(c_idx)
+                if config.motion_profile != "slide" or timeline is not None:
                     pose_top = motion_pose(config.motion_profile, phase,
                         config.offset_distance_px * 1.2, config.hold_ratio,
                         config.seed, config.motion_intensity, "horizontal")
@@ -505,17 +531,19 @@ class PuzzleVideoRenderer:
             raise ValueError(f"Unsupported template_id: {config.template_id}")
 
         for f_idx in range(total_frames):
-            c_idx = f_idx % cycle_frames
-            if config.motion_profile != "slide":
+            c_idx = f_idx if timeline is not None else f_idx % cycle_frames
+            if timeline is not None:
+                aligned = timeline.is_locked(f_idx)
+            elif config.motion_profile != "slide":
                 aligned = motion_pose(config.motion_profile, c_idx / float(cycle_frames),
                     config.offset_distance_px, config.hold_ratio, config.seed,
                     config.motion_intensity).locked
             elif config.template_id in ("OUTLINE_MATCH", "FACE_SPLIT_3BAND"):
-                phase = c_idx / float(cycle_frames)
+                phase = phase_for_frame(c_idx)
                 disp = evaluate_periodic_displacement(phase, hold_ratio=config.hold_ratio, ease_type=config.ease_type)
                 aligned = abs(disp) < 1e-4
             else:
-                cycle_p = c_idx / float(cycle_frames)
+                cycle_p = phase_for_frame(c_idx)
                 aligned = abs(cycle_p - 0.5) <= (config.hold_ratio * 0.5)
             if aligned:
                 alignment_frames.append(f_idx)
@@ -598,18 +626,10 @@ class PuzzleVideoRenderer:
         if ret != 0:
             raise RuntimeError(f"FFmpeg cycle encode failed ({ret}): {stderr_bytes.decode('utf-8', errors='replace')}")
 
-        mux_cmd = [
-            "ffmpeg",
-            "-y",
-            "-loglevel",
-            "error",
-            "-threads",
-            "2",
-            "-stream_loop",
-            str(cycles),
-            "-i",
-            str(cycle_mp4_path),
-        ]
+        mux_cmd = ["ffmpeg", "-y", "-loglevel", "error", "-threads", "2"]
+        if timeline is None:
+            mux_cmd.extend(["-stream_loop", str(cycles)])
+        mux_cmd.extend(["-i", str(cycle_mp4_path)])
         sfx = config.enable_audio and wav_path.is_file()
         speech_path = Path(config.narration_wav).resolve() if config.narration_wav else None
         if speech_path is not None:
@@ -649,7 +669,7 @@ class PuzzleVideoRenderer:
         from services.engine.precision_qa import audit_against_expected_frames
         frame_report = audit_against_expected_frames(
             mp4_path,
-            expected_frame=lambda i: get_cycle_frame(i % cycle_frames)[1],
+            expected_frame=lambda i: get_cycle_frame(i if timeline is not None else i % cycle_frames)[1],
             expected_frames=total_frames,
             max_frame_mae=12.0,
             max_average_mae=6.0,
@@ -662,6 +682,15 @@ class PuzzleVideoRenderer:
         })
         frame_report_path = mp4_path.with_suffix(".frameqa.json")
         frame_report_path.write_text(json.dumps(frame_report, indent=2), encoding="utf-8")
+        if timeline is not None:
+            snap_metadata = timeline.metadata()
+            snap_metadata["observed_alignment_frames"] = len(alignment_frames)
+            snap_metadata["audio_snap_times_sec"] = alignment_onsets_sec
+            if len(alignment_onsets_sec) != len(timeline.passes):
+                raise RuntimeError("Snap timeline did not produce the expected number of match events")
+            mp4_path.with_suffix(".snaps.json").write_text(
+                json.dumps(snap_metadata, indent=2), encoding="utf-8"
+            )
 
         if not saved_align_png and thumb_path.exists():
             Image.open(thumb_path).save(align_png_path)
