@@ -104,32 +104,62 @@ class AnimalPuzzleReelsFactoryTests(unittest.TestCase):
         self.assertAlmostEqual(evaluate_periodic_displacement(0.75, hold_ratio=0.14), -1.0, places=4)
 
     def test_05_rendered_mp4_qa_verification(self) -> None:
-        out_dir = REPO_ROOT.parent / "artifacts/file_generation/ttl=63d/output"
-        mp4_a = out_dir / "sample_template_a_outline_match.mp4"
-        mp4_b = out_dir / "sample_template_b_missing_piece.mp4"
-        self.assertTrue(mp4_a.exists())
-        self.assertTrue(mp4_b.exists())
+        """Render real videos in a fresh directory; never depend on expired artifacts."""
+        with tempfile.TemporaryDirectory(prefix="rfactory_video_test_") as tmp:
+            renderer = PuzzleVideoRenderer(self.assets_root, Path(tmp))
+            for template, species in [
+                ("OUTLINE_MATCH", "lizard"),
+                ("MISSING_PIECE_SLIDE", "donkey"),
+            ]:
+                cfg = RenderConfig(
+                    job_id=f"test_{species}",
+                    template_id=template,
+                    species=species,
+                    seed=1001,
+                    duration_sec=2.0,
+                    cycles=1,
+                    enable_audio=True,
+                )
+                artifact = renderer.render_video(cfg)
+                qa = validate_rendered_video(
+                    artifact.mp4_path,
+                    expected_duration_sec=2.0,
+                    missing_piece_mad=artifact.pixel_match_mad,
+                )
+                self.assertTrue(qa.passed, f"{template}: {qa.errors}")
+                self.assertEqual((qa.width, qa.height), (1080, 1920))
+                self.assertEqual(qa.video_codec, "h264")
+                self.assertEqual(qa.pixel_format, "yuv420p")
+                self.assertEqual(qa.audio_codec, "aac")
 
-        qa_a = validate_rendered_video(mp4_a)
-        qa_b = validate_rendered_video(mp4_b)
-        self.assertTrue(qa_a.passed, f"Sample A failed QA: {qa_a.errors}")
-        self.assertTrue(qa_b.passed, f"Sample B failed QA: {qa_b.errors}")
-        self.assertEqual((qa_a.width, qa_a.height), (1080, 1920))
-        self.assertEqual(qa_a.video_codec, "h264")
-        self.assertEqual(qa_a.pixel_format, "yuv420p")
-        self.assertEqual(qa_a.audio_codec, "aac")
 
     def test_06_batch_14_videos_verified_in_database(self) -> None:
-        repo = FactoryRepository(db_path=self.prod_db_path)
-        with repo._connect() as conn:
-            ready_jobs = conn.execute(
-                "SELECT COUNT(*) AS c FROM render_jobs WHERE status = 'READY'"
-            ).fetchone()["c"]
-            qa_outputs = conn.execute(
-                "SELECT COUNT(*) AS c FROM render_outputs WHERE qa_passed = 1"
-            ).fetchone()["c"]
-        self.assertGreaterEqual(ready_jobs, 14)
-        self.assertGreaterEqual(qa_outputs, 14)
+        """Check batch-to-ready transitions without a shipped runtime SQLite database."""
+        from scripts.bootstrap_factory import bootstrap
+
+        with tempfile.TemporaryDirectory(prefix="rfactory_batch_test_") as tmp:
+            tmp_path = Path(tmp)
+            repo = bootstrap(tmp_path / "batch.db")
+            renderer = PuzzleVideoRenderer(self.assets_root, tmp_path / "renders")
+            worker = BatchProductionWorker(repo, renderer, ContentGenerationAgent())
+            _batch_id, jobs = worker.enqueue_batch_campaign(
+                name="Portable two-video batch",
+                count=2,
+                template_filter="ALL",
+                duration_sec=2.0,
+                enable_audio=False,
+                base_seed=1001,
+            )
+            self.assertEqual(len(jobs), 2)
+            result = worker.process_all_queued_jobs(limit=2)
+            self.assertEqual(len(result), 2)
+            self.assertTrue(all(r["status"] == "READY" for r in result), result)
+            with repo._connect() as conn:
+                ready = conn.execute("SELECT COUNT(*) FROM render_jobs WHERE status='READY'").fetchone()[0]
+                valid = conn.execute("SELECT COUNT(*) FROM render_outputs WHERE qa_passed=1").fetchone()[0]
+            self.assertEqual(ready, 2)
+            self.assertEqual(valid, 2)
+
 
     def test_07_crash_recovery_and_fault_isolation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -326,22 +356,29 @@ class AnimalPuzzleReelsFactoryTests(unittest.TestCase):
             accent_color=(38, 28, 22),
             seed=1013,
         )
-        horiz_bundle = extract_horizontal_slice_bundle(face_rgba, slice_y_ratio=(0.30, 0.54))
-        self.assertEqual(horiz_bundle.pixel_match_mad, 0.0)
-
-        band3_bundle = extract_three_band_face_bundle(face_rgba, split_ratios=(0.37, 0.64))
-        self.assertEqual(band3_bundle.pixel_match_mad, 0.0)
-
-        out_dir = REPO_ROOT.parent / "artifacts/file_generation/ttl=63d/output"
-        mp4_c = out_dir / "sample_celebrity_face_slide.mp4"
-        mp4_d = out_dir / "sample_celebrity_face_3band.mp4"
-        self.assertTrue(mp4_c.exists())
-        self.assertTrue(mp4_d.exists())
-
-        qa_c = validate_rendered_video(mp4_c)
-        qa_d = validate_rendered_video(mp4_d)
-        self.assertTrue(qa_c.passed, f"Sample Celebrity Slide failed QA: {qa_c.errors}")
-        self.assertTrue(qa_d.passed, f"Sample Celebrity 3-Band failed QA: {qa_d.errors}")
+        horiz = extract_horizontal_slice_bundle(face_rgba, slice_y_ratio=(0.30, 0.54))
+        three_band = extract_three_band_face_bundle(face_rgba, split_ratios=(0.37, 0.64))
+        self.assertEqual(horiz.pixel_match_mad, 0.0)
+        self.assertEqual(three_band.pixel_match_mad, 0.0)
+        with tempfile.TemporaryDirectory(prefix="rfactory_face_test_") as tmp:
+            renderer = PuzzleVideoRenderer(self.assets_root, Path(tmp))
+            for template in ("FACE_FEATURE_SLIDE", "FACE_SPLIT_3BAND"):
+                config = RenderConfig(
+                    job_id="face_" + template.lower(),
+                    template_id=template,
+                    species="football_icon",
+                    duration_sec=2.0,
+                    cycles=1,
+                    enable_audio=False,
+                )
+                result = renderer.render_video(config)
+                qa = validate_rendered_video(
+                    result.mp4_path,
+                    expected_duration_sec=2.0,
+                    require_audio=False,
+                    missing_piece_mad=result.pixel_match_mad,
+                )
+                self.assertTrue(qa.passed, f"{template}: {qa.errors}")
 
 
 if __name__ == "__main__":
