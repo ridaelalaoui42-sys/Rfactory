@@ -72,14 +72,14 @@ def motion_pose(
         return MotionPose(locked=True)
     if p < 0.5 - hw:
         u = p / max(1e-6, (0.5 - hw))
-        tail = 1.0 - _ease(u)
-        leaving = False
     else:
-        u = (p - (0.5 + hw)) / max(1e-6, (0.5 - hw))
-        tail = _ease(u)
-        leaving = True
+        # Follow the same trajectory backwards on departure. Both cycle
+        # boundaries now share exactly the same pose. Earlier versions
+        # jumped from +travel to -travel on every loop.
+        u = (1.0 - p) / max(1e-6, (0.5 - hw))
+    tail = 1.0 - _ease(u)
     a = max(0.0, travel_px) * intensity
-    sign = 1 if leaving else -1
+    sign = -1
     handed = -1 if seed % 2 else 1
     px = py = 0.0
     deg = 0.0
