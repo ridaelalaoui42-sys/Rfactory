@@ -57,6 +57,20 @@
             <div class="panel-top"><span class="step">03</span><div><h2>Production & review</h2><p>AI-generated work requires inspection before video rendering.</p></div></div>
             <div id="art-status" class="muted">No artwork yet.</div><label for="edit-prompt">Refine existing artwork with Gemini</label><input id="edit-prompt" maxlength="1800" value="Improve the fine texture, shading and silhouette while preserving the character identity"><button class="btn outline full" id="refine-btn" disabled>✧ Edit this image with Nano Banana</button>
             <button class="btn outline full" id="approve-btn" disabled>✓ Approve image for production</button>
+            <label for="motion-profile">Motion choreography</label>
+            <select id="motion-profile">
+              <option value="">✦ Gemini director's choice</option>
+              <option value="orbit_lock">Orbit &amp; rotate into place</option>
+              <option value="spin_snap">360° spin and snap</option>
+              <option value="pendulum">Pendulum swing</option>
+              <option value="spiral">Spiral with double spin</option>
+              <option value="elastic">Elastic spring bounce</option>
+              <option value="flip_reveal">Flip perspective reveal</option>
+              <option value="zigzag">Zigzag ricochet</option>
+              <option value="slide">Classic slide</option>
+            </select>
+            <label for="motion-intensity">Movement intensity <output id="motion-value">1.0×</output></label>
+            <input type="range" id="motion-intensity" min="0.3" max="2.0" step="0.1" value="1.0">
             <label class="check-row" for="sfx-enabled"><input type="checkbox" id="sfx-enabled" checked> Mix puzzle sound effects with narration</label><button class="btn primary full" id="render-btn" disabled>▶ Render final 9:16 Reel</button>
             <div class="helper">The video is rendered on your server. No Facebook publishing occurs automatically.</div>
           </div>
