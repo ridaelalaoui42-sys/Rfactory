@@ -37,6 +37,11 @@ jobs:
           files=json.loads(Path('storage/showcase_continuous/showcase_manifest.json').read_text())
           assert {x['name'] for x in files} == {'snow_leopard','red_panda','astronaut'}
           for item in files:
+              print('VERIFICATION', item['name'], 'fits', item['fit_count'],
+                    'snap_count', len(item['crossing_times_sec']),
+                    'match_mad', item['exact_fit_mad'],
+                    'frame_count', item['frame_qa'].get('frames_checked'),
+                    'passed', item['frame_qa'].get('passed'), flush=True)
               assert item['fit_count']==5
               assert len(item['crossing_times_sec'])==5
               assert item['exact_fit_mad']==0.0
