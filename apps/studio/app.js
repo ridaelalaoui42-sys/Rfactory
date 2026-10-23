@@ -165,10 +165,10 @@
     state.voice = await request("POST", "/voices", {
       plan_id: state.plan.id,
       text: byId("voice-script").value,
-      style: state.plan.plan.audio_style,
+      style: byId("voice-style").value || state.plan.plan.audio_style,
       language: byId("language").value,
       voice: byId("tts-voice").value,
-      model: "gemini-3.8-flash-lite-tts",
+      model: byId("tts-model").value,
     });
     byId("voice-preview").src = await protectedMedia(state.voice.media_url);
     byId("voice-preview").hidden = false;
@@ -190,6 +190,7 @@
       image_id: state.image.id,
       voice_id: state.voice ? state.voice.id : null,
       duration_sec: Number(byId("duration").value),
+      sfx_enabled: byId("sfx-enabled").checked,
     });
     const url = await protectedMedia(state.render.media_url);
     activatePreview("video", url);
