@@ -12,6 +12,10 @@ on:
       - requirements*.txt
   pull_request:
 
+concurrency:
+  group: rfactory-ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
