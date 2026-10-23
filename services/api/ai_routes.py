@@ -53,6 +53,8 @@ class RenderRequest(BaseModel):
     voice_id: str | None = None
     duration_sec: float = Field(default=15.0, ge=8, le=30)
     sfx_enabled: bool = True
+    motion_profile: Literal["slide", "spin_snap", "orbit_lock", "pendulum", "spiral", "elastic", "flip_reveal", "zigzag"] | None = None
+    motion_intensity: float = Field(default=1.0, ge=0.0, le=2.0)
 
 
 def _run(op):
@@ -130,7 +132,9 @@ def approve_image(image_id: str, store: StudioStore = Depends(get_store)):
 
 @router.post("/renders", status_code=201)
 def render_reel(req: RenderRequest, workflow: StudioWorkflow = Depends(get_workflow)):
-    return _run(lambda: workflow.render(req.plan_id, req.image_id, req.voice_id, req.duration_sec, req.sfx_enabled))
+    return _run(lambda: workflow.render(req.plan_id, req.image_id, req.voice_id,
+                                        req.duration_sec, req.sfx_enabled,
+                                        req.motion_profile, req.motion_intensity))
 
 
 @router.get("/library")
