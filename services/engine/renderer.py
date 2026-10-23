@@ -31,6 +31,7 @@ from services.assets.segmentation import (
     generate_outline_silhouette_rgba,
 )
 from services.assets.sound_fx import synthesize_puzzle_audio_wav
+from services.engine.motion_profiles import motion_pose, transformed_sprite, MOTION_PROFILES, MotionPose
 
 
 @dataclass
@@ -58,6 +59,8 @@ class RenderConfig:
     direction: str = "top_to_bottom"
     enable_audio: bool = True
     safe_area_guides: bool = False
+    motion_profile: str = "slide"
+    motion_intensity: float = 1.0
 
 
 @dataclass
@@ -112,6 +115,14 @@ def alpha_composite_inplace(canvas_rgb: np.ndarray, sprite_rgba: np.ndarray, top
     roi = canvas_rgb[y1:y2, x1:x2].astype(np.uint16)
     blended = (sub_sprite[:, :, :3].astype(np.uint16) * alpha + roi * inv_alpha) // 255
     canvas_rgb[y1:y2, x1:x2] = blended.astype(np.uint8)
+
+
+def draw_motion_sprite(canvas_rgb: np.ndarray, sprite_rgba: np.ndarray,
+                       target_xy: Tuple[int, int], pose: MotionPose) -> None:
+    """Affine motion with a lossless, interpolation-free identity snap."""
+    transformed, (ox, oy) = transformed_sprite(sprite_rgba, pose)
+    alpha_composite_inplace(canvas_rgb, transformed,
+                            (target_xy[0] + pose.dx + ox, target_xy[1] + pose.dy + oy))
 
 
 def evaluate_periodic_displacement(
@@ -170,6 +181,10 @@ class PuzzleVideoRenderer:
         progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> RenderArtifact:
         start_t = time.time()
+        if config.motion_profile not in MOTION_PROFILES:
+            raise ValueError("Unsupported motion profile: " + config.motion_profile)
+        if not 0.0 <= config.motion_intensity <= 2.0:
+            raise ValueError("motion_intensity must be 0 to 2")
         w, h = config.width, config.height
         fps = config.fps
         total_frames = int(round(config.duration_sec * fps))
@@ -258,6 +273,25 @@ class PuzzleVideoRenderer:
 
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
                 phase = c_idx / float(cycle_frames)
+                if config.motion_profile != "slide":
+                    pose = motion_pose(config.motion_profile, phase, config.offset_distance_px,
+                                       config.hold_ratio, config.seed, config.motion_intensity,
+                                       "horizontal")
+                    if c_idx in frame_cache:
+                        encoded, cached = frame_cache[c_idx]
+                        return encoded, cached, pose.locked
+                    frame = static_base_rgb.copy()
+                    for idx, (e_rgba, ex, ey, amp_f) in enumerate(egg_sprites):
+                        egg_pose = motion_pose(config.motion_profile, phase,
+                                               config.offset_distance_px * amp_f,
+                                               config.hold_ratio, config.seed + idx + 1,
+                                               config.motion_intensity, "horizontal")
+                        draw_motion_sprite(frame, e_rgba, (ex, ey), egg_pose)
+                    draw_motion_sprite(frame, animal_rgba,
+                                       (animal_target_x, animal_target_y), pose)
+                    encoded = frame.tobytes()
+                    frame_cache[c_idx] = (encoded, frame)
+                    return encoded, frame, pose.locked
                 disp = evaluate_periodic_displacement(phase, hold_ratio=config.hold_ratio, ease_type=config.ease_type)
                 animal_dx = int(round((disp * config.offset_distance_px) / 12.0)) * 12
                 is_aligned = animal_dx == 0
@@ -297,6 +331,21 @@ class PuzzleVideoRenderer:
 
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
                 cycle_p = c_idx / float(cycle_frames)
+                if config.motion_profile != "slide":
+                    pose = motion_pose(
+                        config.motion_profile, cycle_p,
+                        max(220, config.offset_distance_px * 1.9),
+                        config.hold_ratio, config.seed, config.motion_intensity,
+                        "vertical",
+                    )
+                    if c_idx in frame_cache:
+                        encoded, cached = frame_cache[c_idx]
+                        return encoded, cached, pose.locked
+                    frame = static_base_rgb.copy()
+                    draw_motion_sprite(frame, piece_rgba, (target_px, target_py), pose)
+                    encoded = frame.tobytes()
+                    frame_cache[c_idx] = (encoded, frame)
+                    return encoded, frame, pose.locked
                 hold_w = config.hold_ratio * 0.5
 
                 if abs(cycle_p - 0.5) <= hold_w:
@@ -350,6 +399,21 @@ class PuzzleVideoRenderer:
 
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
                 cycle_p = c_idx / float(cycle_frames)
+                if config.motion_profile != "slide":
+                    pose = motion_pose(
+                        config.motion_profile, cycle_p,
+                        max(220, config.offset_distance_px * 1.9),
+                        config.hold_ratio, config.seed, config.motion_intensity,
+                        "horizontal",
+                    )
+                    if c_idx in frame_cache:
+                        encoded, cached = frame_cache[c_idx]
+                        return encoded, cached, pose.locked
+                    frame = static_base_rgb.copy()
+                    draw_motion_sprite(frame, piece_rgba, (target_px, target_py), pose)
+                    encoded = frame.tobytes()
+                    frame_cache[c_idx] = (encoded, frame)
+                    return encoded, frame, pose.locked
                 hold_w = config.hold_ratio * 0.5
 
                 if abs(cycle_p - 0.5) <= hold_w:
@@ -399,6 +463,26 @@ class PuzzleVideoRenderer:
 
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
                 phase = c_idx / float(cycle_frames)
+                if config.motion_profile != "slide":
+                    pose_top = motion_pose(config.motion_profile, phase,
+                        config.offset_distance_px * 1.2, config.hold_ratio,
+                        config.seed, config.motion_intensity, "horizontal")
+                    if c_idx in frame_cache:
+                        encoded, cached = frame_cache[c_idx]
+                        return encoded, cached, pose_top.locked
+                    pose_mid = motion_pose(config.motion_profile, phase,
+                        config.offset_distance_px * 1.3, config.hold_ratio,
+                        config.seed + 1, config.motion_intensity, "horizontal")
+                    pose_bot = motion_pose(config.motion_profile, phase,
+                        config.offset_distance_px, config.hold_ratio,
+                        config.seed + 2, config.motion_intensity, "horizontal")
+                    frame = static_base_rgb.copy()
+                    draw_motion_sprite(frame, band3.band_top_rgba, (tx_top, ty_top), pose_top)
+                    draw_motion_sprite(frame, band3.band_mid_rgba, (tx_mid, ty_mid), pose_mid)
+                    draw_motion_sprite(frame, band3.band_bot_rgba, (tx_bot, ty_bot), pose_bot)
+                    encoded = frame.tobytes()
+                    frame_cache[c_idx] = (encoded, frame)
+                    return encoded, frame, pose_top.locked
                 disp = evaluate_periodic_displacement(phase, hold_ratio=config.hold_ratio, ease_type=config.ease_type)
                 dx = int(round((disp * config.offset_distance_px) / 10.0)) * 10
                 is_aligned = dx == 0
@@ -421,7 +505,11 @@ class PuzzleVideoRenderer:
 
         for f_idx in range(total_frames):
             c_idx = f_idx % cycle_frames
-            if config.template_id in ("OUTLINE_MATCH", "FACE_SPLIT_3BAND"):
+            if config.motion_profile != "slide":
+                aligned = motion_pose(config.motion_profile, c_idx / float(cycle_frames),
+                    config.offset_distance_px, config.hold_ratio, config.seed,
+                    config.motion_intensity).locked
+            elif config.template_id in ("OUTLINE_MATCH", "FACE_SPLIT_3BAND"):
                 phase = c_idx / float(cycle_frames)
                 disp = evaluate_periodic_displacement(phase, hold_ratio=config.hold_ratio, ease_type=config.ease_type)
                 aligned = abs(disp) < 1e-4
