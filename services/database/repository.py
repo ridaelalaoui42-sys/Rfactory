@@ -123,7 +123,7 @@ class FactoryRepository:
                     "fb_page_1092837465",
                     "https://business.facebook.com/latest/home?asset_id=1092837465",
                     str(worker_profiles_root / "pg_atlas_wildlife"),
-                    "CONNECTED",
+                    "NEEDS_LOGIN",  # Placeholder Page is NOT an authenticated real session.
                     0,
                     2,
                     "23:00",
