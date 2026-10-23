@@ -180,10 +180,20 @@ class StudioWorkflow:
         self.store.write_metadata("plan", key, meta)
         return meta
 
-    def image(self, brief: ImageBrief, plan_id: str | None = None) -> dict[str, Any]:
+    def image(self, brief: ImageBrief, plan_id: str | None = None, source_image_id: str | None = None) -> dict[str, Any]:
         if plan_id:
             self.store.read_metadata("plan", plan_id)
-        blob, actual_prompt = self._call("image", brief.model, lambda: self.provider.image(brief))
+        if source_image_id:
+            previous = self.store.read_metadata("image", source_image_id)
+            if previous.get("plan_id") and previous["plan_id"] != plan_id:
+                raise ApprovalRequired("Source artwork belongs to a different storyboard")
+            source = self.store.media_path("image", source_image_id).read_bytes()
+            blob, actual_prompt = self._call(
+                "image_edit", brief.model,
+                lambda: self.provider.edit_image(source, brief)
+            )
+        else:
+            blob, actual_prompt = self._call("image", brief.model, lambda: self.provider.image(brief))
         key = uuid.uuid4().hex
         path = self.store._path("image", key)
         qa = prepare_subject(blob, path)
@@ -191,6 +201,7 @@ class StudioWorkflow:
             "id": key,
             "kind": "image",
             "plan_id": plan_id,
+            "source_image_id": source_image_id,
             "provider": "gemini",
             "model": brief.model,
             "status": "AWAITING_APPROVAL",
