@@ -226,6 +226,7 @@
       sfx_enabled: byId("sfx-enabled").checked,
       motion_profile: byId("motion-profile").value || null,
       motion_intensity: Number(byId("motion-intensity").value),
+      snap_count: Number(byId("snap-count").value),
     });
     const url = await protectedMedia(state.render.media_url);
     activatePreview("video", url);
@@ -233,7 +234,9 @@
     link.href = url;
     link.hidden = false;
     output("Video QA passed · " + state.render.qa.duration_sec + "s · " +
-      state.render.qa.codec.toUpperCase() + ". Ready for review. NOT PUBLISHED.");
+      state.render.qa.codec.toUpperCase() + " · " +
+      (state.render.snap_count || "several") +
+      " irregular exact-fit moments. Ready for review. NOT PUBLISHED.");
     message("Your AI-powered puzzle Reel has rendered successfully!", "ok");
   });
   byId("motion-intensity").addEventListener("input", () => {
