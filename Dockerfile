@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY services ./services
 COPY scripts ./scripts
+COPY apps/studio ./apps/studio
 COPY storage/assets ./storage/assets
 
 RUN useradd --create-home --uid 10001 rfactory \
