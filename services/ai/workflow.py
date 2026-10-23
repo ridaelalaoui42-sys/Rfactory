@@ -139,6 +139,40 @@ class StudioStore:
             raise NotFoundError("Media file not found")
         return file
 
+    def list_records(self, kind: str, limit: int = 20, offset: int = 0) -> dict[str, Any]:
+        """Cursor-free paginated library of persisted AI work for web/Android."""
+        if kind not in {"plan", "image", "voice", "render"}:
+            raise NotFoundError("Unknown creative asset category")
+        if not 1 <= limit <= 100 or not 0 <= offset <= 10000:
+            raise ValueError("Pagination out of range")
+        folder = {
+            "plan": self.plans,
+            "image": self.images,
+            "voice": self.voices,
+            "render": self.renders,
+        }[kind]
+        candidates = folder.glob("*/*.json") if kind == "render" else folder.glob("*.json")
+        paths = sorted(
+            (path for path in candidates if ID_RE.fullmatch(path.stem)),
+            key=lambda path: path.stat().st_mtime_ns,
+            reverse=True,
+        )
+        items = []
+        for path in paths[offset:offset + limit]:
+            try:
+                entry = json.loads(path.read_text(encoding="utf-8"))
+                if entry.get("kind") == kind:
+                    items.append(entry)
+            except (ValueError, OSError):
+                continue
+        return {
+            "items": items,
+            "total": len(paths),
+            "limit": limit,
+            "offset": offset,
+            "next_offset": offset + limit if offset + limit < len(paths) else None,
+        }
+
     def approve_image(self, image_id: str) -> dict[str, Any]:
         data = self.read_metadata("image", image_id)
         if not data.get("qa", {}).get("qa_passed"):
