@@ -177,3 +177,86 @@ def transformed_sprite(
         borderValue=(0, 0, 0, 0),
     )
     return transformed, ((w - new_w) // 2, (h - new_h) // 2)
+
+def continuous_motion_pose(
+    profile: str,
+    phase: float,
+    travel_px: float = 180.0,
+    hold_ratio: float = 0.14,  # unused compatibility argument
+    seed: int = 0,
+    intensity: float = 1.0,
+    direction: str = "vertical",
+) -> MotionPose:
+    """Motion passes directly THROUGH identity with no solved-state dwell.
+
+    For phase=0.5, return untransformed source pixels for one video frame only.
+    At phase immediately before/after, position and/or rotation is nonzero,
+    including continuous nonzero velocity at crossing. At phase=0 and 1 the
+    transform is identical, preventing discontinuities between passes.
+    """
+    if profile not in MOTION_PROFILES:
+        raise ValueError("Unknown motion profile")
+    if not 0 < intensity <= 2.0:
+        raise ValueError("Continuous motion intensity must be in (0,2]")
+    if not 0.0 <= phase <= 1.0:
+        raise ValueError("Motion phase must be in [0,1]")
+    if direction not in {"horizontal", "vertical"}:
+        raise ValueError("Unknown motion direction")
+    if abs(phase - 0.5) < 1e-12:
+        return MotionPose(locked=True)
+
+    u = 2.0 * math.pi * phase
+    s = math.sin(u)
+    e = 0.5 * (1.0 + math.cos(u))
+    travel = travel_px * intensity
+    hand = -1.0 if seed % 2 else 1.0
+    # Each profile uses harmonics with a NONZERO derivative at phase .5.
+    # e is nonzero at pass boundaries, so those frames are NOT false solves.
+    x = y = angle = 0.0
+    sx = sy = 1.0
+
+    if profile == "slide":
+        primary = travel * (0.6 * e + 0.7 * s)
+        if direction == "horizontal":
+            x = primary
+        else:
+            y = primary
+    elif profile == "spin_snap":
+        x = travel * (0.38 * e + 0.48 * s)
+        y = travel * (0.45 * e - 0.35 * s)
+        angle = hand * (220 * e + 185 * s) * intensity
+    elif profile == "orbit_lock":
+        x = travel * (0.55 * e + 0.68 * s)
+        y = travel * (0.30 * e - 0.57 * s)
+        angle = hand * (72 * e + 40 * s)
+    elif profile == "pendulum":
+        x = hand * travel * (0.18 * e + 0.8 * s)
+        y = -travel * (0.6 * e + 0.2 * s)
+        angle = hand * (34 * e + 48 * s) * intensity
+    elif profile == "spiral":
+        # Phase winds a continuous orbit around the target and passes through
+        # center with nonzero tangent, not a damped stop.
+        x = travel * (0.40 * e + 0.65 * s + 0.14 * e * math.sin(3*u))
+        y = travel * (0.32 * e - 0.72 * s + 0.12 * e * math.cos(3*u))
+        angle = hand * (400 * e + 270 * s) * intensity
+    elif profile == "elastic":
+        x = travel * (0.20 * e + 0.52 * s + 0.18 * e * math.sin(4*u))
+        y = travel * (0.42 * e - 0.60 * s)
+        angle = hand * (15 * e + 19 * s)
+        sx = 1.0 + 0.06 * (e + s)
+        sy = 1.0 / sx
+    elif profile == "flip_reveal":
+        x = travel * (0.28 * e + 0.71 * s)
+        y = travel * (0.21 * e - 0.30 * s)
+        angle = hand * (24 * e + 24 * s)
+        sx = 1.0 - 0.75 * e
+    elif profile == "zigzag":
+        x = travel * (0.36 * e + 0.66 * s + 0.15 * e * math.sin(5*u))
+        y = travel * (0.40 * e - 0.65 * s)
+        angle = hand * (23 * e + 26 * s)
+    return MotionPose(
+        dx=int(round(x)), dy=int(round(y)),
+        angle_deg=round(angle, 4),
+        scale_x=round(sx, 5), scale_y=round(sy, 5),
+        locked=False,
+    )
