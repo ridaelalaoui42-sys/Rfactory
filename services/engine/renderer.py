@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import hashlib
 import math
+import uuid
+import shutil
 import subprocess
 import time
 from dataclasses import dataclass
@@ -36,6 +38,8 @@ class RenderConfig:
     job_id: str
     template_id: str
     species: str
+    asset_path: str = ""  # storage/assets-relative original AI sprite (optional)
+    narration_wav: str = ""  # generated TTS WAV; server-side path only
     seed: int = 1001
     width: int = 1080
     height: int = 1920
@@ -176,20 +180,30 @@ class PuzzleVideoRenderer:
         job_dir = self.outputs_root / config.job_id
         job_dir.mkdir(parents=True, exist_ok=True)
         mp4_path = job_dir / f"{config.job_id}.mp4"
-        scratch_dir = Path("/tmp/aprf_scratch")
+        # Per-render scratch directory prevents collisions during concurrent jobs.
+        scratch_dir = job_dir / ("scratch_" + uuid.uuid4().hex)
         scratch_dir.mkdir(parents=True, exist_ok=True)
         cycle_mp4_path = scratch_dir / f"{config.job_id}_cycle.mp4"
         thumb_path = job_dir / f"{config.job_id}_thumb.png"
         align_png_path = job_dir / f"{config.job_id}_aligned.png"
         wav_path = scratch_dir / f"{config.job_id}_audio.wav"
 
-        animal_png = self.assets_root / "animals" / f"{config.species}.png"
-        if not animal_png.exists():
-            face_png = self.assets_root / "faces" / f"{config.species}.png"
-            if face_png.exists():
-                animal_png = face_png
-            else:
-                raise FileNotFoundError(f"Subject asset not found: {animal_png}")
+        if config.asset_path:
+            # Only allow assets beneath the trusted private asset library;
+            # never interpret arbitrary client-supplied absolute file paths.
+            animal_png = (self.assets_root / config.asset_path).resolve()
+            if not animal_png.is_relative_to(self.assets_root.resolve()) or animal_png.suffix.lower() != ".png":
+                raise ValueError("Invalid AI subject asset path")
+            if not animal_png.is_file():
+                raise FileNotFoundError("Requested AI subject asset is missing")
+        else:
+            animal_png = self.assets_root / "animals" / f"{config.species}.png"
+            if not animal_png.exists():
+                face_png = self.assets_root / "faces" / f"{config.species}.png"
+                if face_png.exists():
+                    animal_png = face_png
+                else:
+                    raise FileNotFoundError(f"Subject asset not found: {animal_png}")
         raw_animal_rgba = np.array(Image.open(animal_png).convert("RGBA"))
 
         alignment_frames: List[int] = []
@@ -507,19 +521,32 @@ class PuzzleVideoRenderer:
             "-i",
             str(cycle_mp4_path),
         ]
-        if config.enable_audio and wav_path.exists():
+        sfx = config.enable_audio and wav_path.is_file()
+        speech_path = Path(config.narration_wav).resolve() if config.narration_wav else None
+        if speech_path is not None:
+            # A generated voice file must belong to the local Rfactory storage
+            # area; reject attempts to read system files through renderer config.
+            storage_root = self.assets_root.resolve().parent
+            if not speech_path.is_relative_to(storage_root) or speech_path.suffix.lower() != ".wav":
+                raise ValueError("Narration must be a server-owned WAV asset")
+            if not speech_path.is_file():
+                raise FileNotFoundError("Narration WAV is missing")
+        if sfx:
             mux_cmd.extend(["-i", str(wav_path)])
+        if speech_path is not None:
+            mux_cmd.extend(["-i", str(speech_path)])
 
-        mux_cmd.extend(
-            [
-                "-t",
-                f"{config.duration_sec:.3f}",
-                "-c:v",
-                "copy",
-            ]
-        )
-        if config.enable_audio and wav_path.exists():
-            mux_cmd.extend(["-c:a", "aac", "-b:a", "128k"])
+        mux_cmd.extend(["-map", "0:v:0", "-t", f"{config.duration_sec:.3f}", "-c:v", "copy"])
+        if sfx and speech_path:
+            mux_cmd.extend([
+                "-filter_complex",
+                "[1:a]volume=0.22[sfx];[sfx][2:a]amix=inputs=2:duration=longest:dropout_transition=0[mixed]",
+                "-map", "[mixed]", "-c:a", "aac", "-b:a", "128k",
+            ])
+        elif sfx or speech_path:
+            mux_cmd.extend(["-map", "1:a:0", "-c:a", "aac", "-b:a", "128k"])
+        else:
+            mux_cmd.append("-an")
         mux_cmd.extend(["-movflags", "+faststart", str(mp4_path)])
 
         mux_res = subprocess.run(mux_cmd, capture_output=True, text=True, check=False)
@@ -531,8 +558,8 @@ class PuzzleVideoRenderer:
 
         if cycle_mp4_path.exists():
             cycle_mp4_path.unlink()
-        if wav_path.exists():
-            wav_path.unlink()
+        if scratch_dir.exists():
+            shutil.rmtree(scratch_dir, ignore_errors=True)
 
         sha256_hash = hashlib.sha256(mp4_path.read_bytes()).hexdigest()
         elapsed = round(time.time() - start_t, 3)
