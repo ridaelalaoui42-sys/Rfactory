@@ -1,66 +1,95 @@
-# Animal Puzzle Reels Factory
+# Rfactory — Puzzle Reels Video Engine
 
-Autonomous 9:16 vertical visual-puzzle video production platform, procedural motion-graphics engine, durable batch queue, and supervised Playwright Meta Business Suite publisher.
+Offline procedural video generation for original, 9:16 visual-puzzle Reels. This repository was recovered from the verified `Repo/Apf.zip` release on 23 October 2026.
 
-## 1. Architecture Overview
+**Status: render engine works; this is an early-stage developer project, NOT a production Facebook automation service.** The archive's HTML dashboard is a static demo generator and the Playwright publisher is simulated. Real Facebook publishing is intentionally blocked until a verified browser workflow is implemented.
 
-```
-+-----------------------------------------------------------------------------------+
-|                        Next.js / Canvas Production Dashboard                      |
-|  Overview | Video Studio | Batch Studio | Asset Library | Calendar | Page Manager |
-+-----------------------------------------+-----------------------------------------+
-                                          | REST API / State Sync
-                                          v
-+-----------------------------------------------------------------------------------+
-|                 Durable Relational Store (PostgreSQL 16 / SQLite 3)               |
-|  16 Tables: users, brands, facebook_pages, assets, asset_masks, ideas,            |
-|  video_projects, batches, render_jobs, render_outputs, scheduled_posts,           |
-|  publish_attempts, published_posts, audit_events, metrics_snapshots, settings     |
-+-------------------+-------------------------------------------+-------------------+
-                    |                                           |
-                    v                                           v
-+---------------------------------------+   +---------------------------------------+
-|   Asset & Render Worker Engine        |   |   Publisher Adapter Worker            |
-| - Offline SVG + RGBA Synthesizer      |   | - ManualExportPublisher (Default)     |
-| - OpenCV Exterior Flood-Fill Masking  |   | - MetaBusinessSuitePlaywrightPublisher|
-| - Pixel-Perfect Slice Extraction      |   | - Persistent Profile Dir Isolation    |
-| - Remotion + Fast FFmpeg Pipe (30fps) |   | - Active Page Identity Guard          |
-| - FFprobe & OpenCV Automated QA       |   | - UNKNOWN_RESULT Duplicate Quarantine |
-+---------------------------------------+   +---------------------------------------+
-```
+## Verified capabilities
 
-## 2. Database Entity-Relationship Summary (16 Tables)
+- Original bundled artwork and offline animal/object generation.
+- Four deterministic animation styles: outline matching, missing vertical piece, face slice, and three-band face split.
+- FFmpeg output and FFprobe/OpenCV QA for H.264 vertical video.
+- SQLite project/job states, batch queue, offline batch renderer and manual export adapter.
+- 15 self-contained tests and a smoke render in GitHub Actions, with no Facebook connections.
+- Local FastAPI management endpoints (bearer authentication for remote access).
 
-- `users` -> manages operator accounts and default timezone (`Africa/Casablanca`).
-- `brands` -> `facebook_pages` (1:N): stores per-Page session health, daily caps (`2/day`), quiet hours (`23:00-07:00`), and active mutex lock (`active_lock_job_id`).
-- `assets` -> `asset_masks` (1:N): stores SHA-256 content hashes, CC0 provenance, alpha validation metrics, and pixel-perfect missing-piece slice coordinates (`pixel_match_mad = 0.0`).
-- `ideas` -> `video_projects` -> `render_jobs` -> `render_outputs`: tracks deterministic seeds, JSON template configs, and automated FFprobe/OpenCV QA reports.
-- `batches` -> `render_jobs` (1:N): tracks 10/25/50/100-video campaigns with fault isolation.
-- `scheduled_posts` -> `publish_attempts` & `published_posts`: enforces idempotency keys, approval gates, and `UNKNOWN_RESULT` quarantine.
-- `audit_events`, `metrics_snapshots`, `system_settings`: append-only operational audit trail and runtime switches.
+See [production audit](docs/PRODUCTION_AUDIT.md) for risks and remaining milestones.
 
-## 3. Quick Start Commands (Zero Paid API Keys Required)
+## Requirements
+
+- Python 3.11+
+- FFmpeg and FFprobe available on PATH
+- Enough disk for rendered videos and bundled static assets
+
+Quick start from the repository root:
 
 ```bash
-# 1. Copy environment template
-cp .env.example .env
+python -m venv .venv
+# On Linux/macOS:
+source .venv/bin/activate
+# On Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 
-# 2. Run automated test suite (10 test suites: assets, masks, pixel alignment, QA, DB, scheduler, publisher)
-python3 -m unittest discover -s tests -v
+# Initialize local database, seed placeholder Pages and register 23 bundled assets:
+python -m scripts.bootstrap_factory
 
-# 3. Start FastAPI backend service
-uvicorn services.api.server:app --host 0.0.0.0 --port 8000
+# Generate two 15-second videos completely offline:
+python -m scripts.run_batch --count 2 --duration 15 --audio
 
-# 4. Or launch full stack via Docker Compose
-docker compose up --build -d
+# Generate ten puzzle videos:
+python -m scripts.run_batch --count 10 --duration 15 --template ALL --audio
+
+# Run tests (use pip install -r requirements-dev.txt first):
+python -m unittest discover -s tests -v
+
+# Single 2-second 1080×1920 MP4 QA verification:
+python -m scripts.smoke_render
 ```
 
-## 4. Authorized Playwright Human Login Setup (No Meta Graph API Required)
+Output files are written to `storage/renders/` and the local state database to `storage/factory.db`. Both are ignored by Git.
 
-1. Browser automation is **disabled by default** (`BROWSER_AUTOMATION_ENABLED=false` and `browser_publishing_enabled=0` per Page).
-2. To connect a Facebook Page you administer:
-   - Open **Facebook Page Manager** in the dashboard and click **Launch Human Browser Login**.
-   - Chromium opens with a dedicated private `--user-data-dir` under `./storage/browser_profiles/<page_id>` (never committed to Git or exposed via API).
-   - Complete Facebook login and MFA/2FA interactively in the browser window.
-3. Always run a **Supervised Dry-Run** (`dry_run=True`) first: the worker opens Meta Business Suite, verifies the active Page header matches `page_name`, attaches the 1080×1920 MP4, populates the caption, captures a sanitized screenshot, and halts before clicking final Publish.
-4. If confirmation is ever ambiguous after submission, the post transitions to `UNKNOWN_RESULT` and is **never** automatically retried until an operator verifies the Page.
+## API
+
+Start locally with:
+
+```bash
+python -m scripts.bootstrap_factory
+uvicorn services.api.server:app --host 127.0.0.1 --port 8000
+```
+
+API: `GET /api/health`, `GET /api/overview`, `POST /api/batches`, `POST /api/schedule`.
+
+**Important:** `POST /api/batches` currently queues jobs only. Process them with the standalone worker/CLI; there is no always-on queue consumer yet. Do not bind the API to a public interface without `RFACTORY_API_TOKEN` and a proper access-control/reverse-proxy strategy.
+
+When `RFACTORY_API_TOKEN` is configured, send `Authorization: Bearer <token>` with all management API requests.
+
+## Docker Compose
+
+The branch includes a working **API-only** Dockerfile/Compose target using SQLite, not the unimplemented PostgreSQL/Next.js services previously claimed by the archived README:
+
+```bash
+# Supply a strong random token through your environment:
+export RFACTORY_API_TOKEN='REPLACE_WITH_A_STRONG_SECRET'
+docker compose up --build
+```
+
+The API listens on `127.0.0.1:8000` on the host, with persistent `./storage` data. Docker packaging is supplied but end-to-end container runtime verification should be completed on the deployment host.
+
+## Facebook publishing: not yet implemented
+
+- No Meta Graph API access is needed to generate videos.
+- The imported `MetaBusinessSuitePlaywrightPublisher` only simulates UI behavior; it is **not real Playwright automation**.
+- This branch blocks normal publishing operations, avoiding false `PUBLISHED` records and invented Facebook links.
+- Explicit DOM simulation is confined to tests via `RFACTORY_ALLOW_TEST_SIMULATION=1`.
+- Manual export is the only currently meaningful publishing handoff.
+- Real Playwright automation needs a separately tested manual-login browser worker, Page identity verification, supervised dry-run, UI change handling and restrictions/compliance review.
+
+Do not post without verifying rights for any bundled artwork: some metadata references studio files named `watermarked_img_...`; the release alone does not demonstrate commercial licensing.
+
+## Release recovery and audit
+
+- [Read-only ZIP inventory](docs/RELEASE_ARCHIVE_INVENTORY.md)
+- [Safe import report](docs/RELEASE_IMPORT_REPORT.md)
+- [Prioritized technical audit](docs/PRODUCTION_AUDIT.md)
+
+The protected `main` branch remains unchanged until the reviewed pull request is merged.
