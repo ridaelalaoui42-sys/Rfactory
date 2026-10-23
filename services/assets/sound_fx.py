@@ -7,7 +7,7 @@ from __future__ import annotations
 import math
 import wave
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 
@@ -17,6 +17,7 @@ def synthesize_puzzle_audio_wav(
     duration_sec: float = 15.0,
     alignment_timestamps_sec: Optional[List[float]] = None,
     enable_music: bool = True,
+    enable_ticks: bool = True,
     seed: int = 42,
     sample_rate: int = 44100,
 ) -> Path:
@@ -52,19 +53,20 @@ def synthesize_puzzle_audio_wav(
             left[start_i:end_i] += tone * pan
             right[start_i:end_i] += tone * (1.0 - pan)
 
-    # Soft rhythmic woodblock tick every 0.5 seconds
-    tick_interval = 0.5
-    n_ticks = int(duration_sec / tick_interval)
-    for k in range(n_ticks):
-        start_i = int(k * tick_interval * sample_rate)
-        tick_len = min(int(0.045 * sample_rate), n_samples - start_i)
-        if tick_len <= 0:
-            break
-        seg_t = np.arange(tick_len, dtype=np.float32) / sample_rate
-        env = np.exp(-seg_t * 85.0) * 0.14
-        tick_wave = np.sin(2.0 * math.pi * 1120.0 * seg_t) * env
-        left[start_i : start_i + tick_len] += tick_wave
-        right[start_i : start_i + tick_len] += tick_wave
+    if enable_ticks:
+        # Soft rhythmic woodblock tick every 0.5 seconds
+        tick_interval = 0.5
+        n_ticks = int(duration_sec / tick_interval)
+        for k in range(n_ticks):
+            start_i = int(k * tick_interval * sample_rate)
+            tick_len = min(int(0.045 * sample_rate), n_samples - start_i)
+            if tick_len <= 0:
+                break
+            seg_t = np.arange(tick_len, dtype=np.float32) / sample_rate
+            env = np.exp(-seg_t * 85.0) * 0.14
+            tick_wave = np.sin(2.0 * math.pi * 1120.0 * seg_t) * env
+            left[start_i : start_i + tick_len] += tick_wave
+            right[start_i : start_i + tick_len] += tick_wave
 
     # Bright alignment bell chime at each exact alignment window
     for align_sec in alignment_timestamps_sec or []:
