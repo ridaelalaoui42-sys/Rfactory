@@ -73,7 +73,7 @@ export RFACTORY_API_TOKEN='REPLACE_WITH_A_STRONG_SECRET'
 docker compose up --build
 ```
 
-The API listens on `127.0.0.1:8000` on the host, with persistent `./storage` data. Docker packaging is supplied but end-to-end container runtime verification should be completed on the deployment host.
+The API listens on `127.0.0.1:8000` on the host. Docker data is persisted in a named volume `rfactory_data` (not host `./storage`); this lets the unprivileged container user write runtime files. Export videos from the container or volume as needed. Docker packaging is supplied but end-to-end container runtime verification should be completed on the deployment host.
 
 ## Facebook publishing: not yet implemented
 
