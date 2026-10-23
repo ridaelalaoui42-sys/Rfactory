@@ -40,6 +40,7 @@ class PlanRequest(BaseModel):
 
 class ImageRequest(ImageBrief):
     plan_id: str | None = None
+    source_image_id: str | None = None
 
 
 class VoiceRequest(VoiceBrief):
@@ -94,7 +95,7 @@ def generate_plan(req: PlanRequest, workflow: StudioWorkflow = Depends(get_workf
 
 @router.post("/images", status_code=201)
 def generate_image(req: ImageRequest, workflow: StudioWorkflow = Depends(get_workflow)):
-    return _run(lambda: workflow.image(ImageBrief.model_validate(req.model_dump(exclude={"plan_id"})), req.plan_id))
+    return _run(lambda: workflow.image(ImageBrief.model_validate(req.model_dump(exclude={"plan_id", "source_image_id"})), req.plan_id, req.source_image_id))
 
 
 @router.post("/voices", status_code=201)
