@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1224">
+  <meta name="description" content="Rfactory AI-assisted visual puzzle video production studio.">
+  <link rel="manifest" href="/studio-static/manifest.webmanifest">
+  <link rel="stylesheet" href="/studio-static/style.css">
+  <title>Rfactory · AI Creative Studio</title>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-icon">R<span class="brand-dot">.</span></span><span><strong>Rfactory</strong><small>AI CREATIVE STUDIO</small></span></div>
+      <div class="sidebar-label">WORKSPACE</div>
+      <div class="nav-active">✦ &nbsp; Creative Studio</div>
+      <div class="nav-passive">▦ &nbsp; Content Library <span>Next</span></div>
+      <div class="nav-passive">◷ &nbsp; Publishing Queue <span>Next</span></div>
+      <div class="sidebar-foot"><span class="led"></span><span id="connection-state">Not connected</span><p>Original artwork · Controlled AI generation<br>Human approval before publishing</p></div>
+    </aside>
+    <main>
+      <header class="topbar"><div><div class="breadcrumb">Workspace / <b>Studio</b></div><h1>Make something extraordinary<span class="accent">.</span></h1><p>Art-direct original puzzle Reels from an idea to a finished video.</p></div><div class="key-box"><label for="api-token">Backend access token</label><div class="key-row"><input id="api-token" type="password" placeholder="Paste server token" autocomplete="off"><button id="connect" class="btn outline">Connect</button></div><small>Only used in this page session. Never enter a Gemini API key here.</small></div></header>
+      <div id="notice" role="status" aria-live="polite" class="notice">Connect to your private Rfactory backend to activate the AI studio.</div>
+      <div class="layout">
+        <section class="controls">
+          <div class="panel">
+            <div class="panel-top"><span class="step">01</span><div><h2>Creative direction</h2><p>Shape the idea, visual identity and challenge.</p></div></div>
+            <label for="topic">Concept / subject</label><textarea id="topic" rows="3" maxlength="250">A magnificent golden fox with a missing moving piece that fits perfectly into its body</textarea>
+            <div class="grid-two">
+              <div><label for="style">Art direction</label><select id="style"><option value="premium_3d">Premium 3D editorial</option><option value="storybook">Luxury storybook</option><option value="clay">Tactile claymation</option><option value="hand_painted">Hand-painted illustration</option><option value="editorial">Photographic editorial</option><option value="neon">Electric neon</option></select></div>
+              <div><label for="template">Puzzle format</label><select id="template"><option value="MISSING_PIECE_SLIDE">Missing piece slide</option><option value="OUTLINE_MATCH">Outline matching</option><option value="FACE_FEATURE_SLIDE">Face-feature slider</option><option value="FACE_SPLIT_3BAND">Three-band face puzzle</option></select></div>
+              <div><label for="language">Language</label><select id="language"><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option><option value="ar">العربية</option></select></div>
+              <div><label for="duration">Reel duration</label><select id="duration"><option value="15">15 seconds</option><option value="8">8 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option></select></div>
+            </div>
+            <label for="twist">Creative twist</label><input id="twist" value="Clean perfect alignment with a delightful reveal" maxlength="250">
+            <button class="btn primary full" id="plan-btn">✦ Generate Gemini storyboard</button>
+            <span class="helper">Gemini creates a distinctive art brief, caption, motion concept and voiceover script.</span>
+          </div>
+          <div class="panel" id="storyboard-panel" hidden>
+            <div class="panel-top"><span class="step">02</span><div><h2>Director's cut</h2><p>Review and refine prompts before spending image/voice credits.</p></div></div>
+            <h3 id="plan-title"></h3><p class="story-meta" id="plan-hook"></p>
+            <label for="image-prompt">Image generation prompt</label><textarea id="image-prompt" rows="5"></textarea>
+            <label for="voice-script">Narration transcript</label><textarea id="voice-script" rows="3"></textarea>
+            <div class="grid-two">
+              <div><label for="image-model">Image model</label><select id="image-model"><option value="gemini-nano-banana-2.1">Nano Banana 2.1</option><option value="gemini-3.1-flash-lite-image">Nano Banana Lite</option><option value="gemini-3-pro-image">Nano Banana Pro</option></select></div>
+              <div><label for="tts-voice">TTS character</label><select id="tts-voice"><option>Kore</option><option>Puck</option><option>Aoede</option><option>Charon</option><option>Fenrir</option></select></div>
+            </div>
+            <div class="btn-row"><button class="btn primary" id="image-btn">✦ Generate original art</button><button class="btn outline" id="voice-btn">◉ Generate voiceover</button></div>
+          </div>
+          <div class="panel" id="production-panel" hidden>
+            <div class="panel-top"><span class="step">03</span><div><h2>Production & review</h2><p>AI-generated work requires inspection before video rendering.</p></div></div>
+            <div id="art-status" class="muted">No artwork yet.</div>
+            <button class="btn outline full" id="approve-btn" disabled>✓ Approve image for production</button>
+            <button class="btn primary full" id="render-btn" disabled>▶ Render final 9:16 Reel</button>
+            <div class="helper">The video is rendered on your server. No Facebook publishing occurs automatically.</div>
+          </div>
+        </section>
+        <section class="preview-column">
+          <div class="preview-title"><div><h2>Live preview</h2><p>Original AI media, rendered for mobile.</p></div><span class="pill">9:16 · HD</span></div>
+          <div class="preview-stage">
+            <div class="phone-frame"><div class="phone-screen"><div class="placeholder" id="placeholder"><span class="art-star">✳</span><b>Your next viral moment<br>starts with an idea.</b><small>Original AI art &amp; motion. Nothing generic.</small></div><img id="image-preview" alt="AI-generated puzzle artwork" hidden><video id="video-preview" playsinline controls loop hidden></video></div></div>
+          </div>
+          <div class="output-card"><div class="output-label">PRODUCTION STATUS</div><div id="output-status">No media has been generated.</div><audio id="voice-preview" controls hidden></audio><a id="download" class="btn outline full" hidden download="rfactory-reel.mp4">↓ Download finished MP4</a><p class="fine-print">Generations can incur Gemini API charges. You approve artwork before rendering. Provider errors are shown instead of silently switching to generic graphics.</p></div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="/studio-static/app.js" defer></script>
+</body>
+</html>
