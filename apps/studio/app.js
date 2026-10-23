@@ -37,6 +37,21 @@
     if (!response.ok) throw Error(body.detail || "Request failed (HTTP " + response.status + ")");
     return body;
   }
+  async function uploadArtwork(file, planId) {
+    if (!state.token) throw Error("Connect your backend first.");
+    const form = new FormData();
+    form.append("file", file, file.name);
+    if (planId) form.append("plan_id", planId);
+    const response = await fetch(apiBase + "/images/import", {
+      method: "POST",
+      headers: {Authorization: "Bearer " + state.token},
+      body: form,
+      cache: "no-store"
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw Error(body.detail || "Artwork import failed");
+    return body;
+  }
   async function protectedMedia(relativeUrl) {
     const response = await fetch(relativeUrl, {
       headers: { Authorization: "Bearer " + state.token }, cache: "no-store",
@@ -128,6 +143,20 @@
     byId("production-panel").hidden = false;
     message("Original Gemini storyboard created. Review and edit the art/voice prompts.", "ok");
     output("Storyboard ready: " + creative.title + ". No image or voice credits have been used yet.");
+    updateButtons();
+  });
+  handle(byId("upload-btn"), "Validating your artwork...", async () => {
+    if (!state.plan) throw Error("Create a storyboard before importing artwork.");
+    const file = byId("artwork-file").files[0];
+    if (!file) throw Error("Select an original PNG, JPEG or WebP image first.");
+    if (file.size > 10 * 1024 * 1024) throw Error("Please choose an image under 10 MB.");
+    state.image = await uploadArtwork(file, state.plan.id);
+    activatePreview("image", await protectedMedia(state.image.media_url));
+    byId("download").hidden = true;
+    byId("art-status").textContent =
+       "Artwork imported and mask QA passed. Verify you own the rights, then approve it.";
+    message("Artwork imported locally without paid image generation.", "ok");
+    output("Imported image ready for approval. Gemini image credits were not used.");
     updateButtons();
   });
   handle(byId("image-btn"), "Generating Nano Banana artwork...", async () => {
