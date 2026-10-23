@@ -84,7 +84,8 @@ class RandomSnapTimelineTests(unittest.TestCase):
             for win in metadata["snap_windows"]:
                 first, last = win["first_locked_frame"], win["last_locked_frame"]
                 self.assertTrue(set(range(first, last + 1)).issubset(aligned_set))
-                self.assertGreaterEqual(last - first, 2)
+                self.assertEqual(last, first)
+                self.assertEqual(len(result.alignment_frames), 3)
 
 
 if __name__ == "__main__":
