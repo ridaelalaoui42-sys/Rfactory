@@ -217,10 +217,15 @@ def continuous_motion_pose(
 
     if profile == "slide":
         primary = travel * (0.6 * e + 0.7 * s)
+        # The orthogonal lane adds movement at the primary axis turning
+        # point. Without it, integer rounding can repeat adjacent frames.
+        drift = travel * 0.33 * math.sin(u)
         if direction == "horizontal":
             x = primary
+            y = drift
         else:
             y = primary
+            x = drift
     elif profile == "spin_snap":
         x = travel * (0.38 * e + 0.48 * s)
         y = travel * (0.45 * e - 0.35 * s)
