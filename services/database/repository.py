@@ -59,8 +59,10 @@ class FactoryRepository:
         conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON;")
-        conn.execute("PRAGMA journal_mode = MEMORY;")
-        conn.execute("PRAGMA synchronous = OFF;")
+        # WAL + NORMAL preserve committed data across process crashes while
+        # allowing concurrent readers. MEMORY/OFF could silently lose jobs.
+        conn.execute("PRAGMA journal_mode = WAL;")
+        conn.execute("PRAGMA synchronous = NORMAL;")
         return conn
 
     def _init_db(self) -> None:
