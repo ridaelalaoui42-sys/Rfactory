@@ -27,6 +27,12 @@ jobs:
           cache: pip
       - name: Install runtime dependencies
         run: pip install -r requirements-dev.txt
+      - name: Install video codec tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
       - name: Check Python syntax
         run: python -m compileall -q services tests scripts
       - name: Run portable unit and release-safety tests
