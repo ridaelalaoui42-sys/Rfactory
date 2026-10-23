@@ -201,6 +201,36 @@ class GeminiCreativeStudio:
             raise ProviderError("AI image content is not decodable") from exc
         return blob, prompt
 
+    def edit_image(self, source: bytes, brief: ImageBrief) -> tuple[bytes, str]:
+        """Edit AI-owned artwork through Gemini text+image input, no fake redraws."""
+        allowed_model("image", brief.model)
+        if not source or len(source) > 15 * 1024 * 1024:
+            raise ValueError("Image reference must be nonempty and under 15 MB")
+        prompt = (
+            "Edit the supplied image according to this request: " + brief.prompt
+            + ". Maintain the same single subject, coherent character identity, "
+              "excellent anatomical consistency, complete limbs and edges, "
+              "isolated pure-white/transparent background with 10% padding, "
+              "no captions, no watermarks. Style: " + brief.style
+        )
+        response = self.client.interactions.create(
+            model=brief.model,
+            input=[
+                {"type": "text", "text": prompt},
+                {"type": "image", "data": base64.b64encode(source).decode("ascii"), "mime_type": "image/png"},
+            ],
+        )
+        encoded = getattr(getattr(response, "output_image", None), "data", None)
+        if not encoded:
+            raise ProviderError("Gemini returned no edited image")
+        blob = _decode_payload(encoded, 15 * 1024 * 1024)
+        try:
+            with Image.open(io.BytesIO(blob)) as image:
+                image.verify()
+        except Exception as exc:
+            raise ProviderError("Edited image is not decodable") from exc
+        return blob, prompt
+
     def voice(self, brief: VoiceBrief) -> bytes:
         allowed_model("tts", brief.model)
         if brief.voice not in VOICES:
