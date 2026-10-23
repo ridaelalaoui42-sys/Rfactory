@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+env/
+.pyright/
+.mypy_cache/
+.ruff_cache/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+credentials.json
+service-account*.json
+
+# Local databases, journals and runtime state
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+storage/browser_profiles/
+storage/sessions/
+storage/logs/
+storage/exports/
+storage/renders/
+storage/outputs/
+storage/runtime/
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+
+# System
+.DS_Store
+Thumbs.db
