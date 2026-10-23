@@ -42,6 +42,16 @@ class CinematicMotionTests(unittest.TestCase):
             signatures.add(signature)
         self.assertEqual(len(signatures), len(MOTION_PROFILES))
 
+    def test_every_cycle_closes_without_teleporting(self):
+        for profile in MOTION_PROFILES:
+            start = motion_pose(profile, 0.0, travel_px=240, seed=7)
+            finish = motion_pose(profile, 0.999999, travel_px=240, seed=7)
+            self.assertLessEqual(abs(start.dx - finish.dx), 1, profile)
+            self.assertLessEqual(abs(start.dy - finish.dy), 1, profile)
+            self.assertLessEqual(abs(start.angle_deg - finish.angle_deg), 0.1, profile)
+            self.assertLessEqual(abs(start.scale_x - finish.scale_x), 0.001, profile)
+            self.assertLessEqual(abs(start.scale_y - finish.scale_y), 0.001, profile)
+
     def test_intensity_does_not_affect_pixel_perfect_snap(self):
         for intensity in (0.0, 0.6, 1.0, 1.8, 2.0):
             for name in MOTION_PROFILES:
@@ -74,6 +84,13 @@ class CinematicMotionTests(unittest.TestCase):
                 )
                 self.assertTrue(report.passed, (profile, report.errors))
                 self.assertTrue(Path(artifact.mp4_path).is_file())
+                reference_qa = Path(artifact.mp4_path).with_suffix(".frameqa.json")
+                self.assertTrue(reference_qa.is_file())
+                import json
+                result = json.loads(reference_qa.read_text())
+                self.assertEqual(result["frames_checked"], 60)
+                self.assertTrue(result["passed"])
+                self.assertEqual(result["motion_profile"], profile)
 
 
 if __name__ == "__main__":
