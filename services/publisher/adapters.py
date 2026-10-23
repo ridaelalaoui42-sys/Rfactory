@@ -195,6 +195,21 @@ class MetaBusinessSuitePlaywrightPublisher:
         page_id = str(row["page_id"])
         cur_sched_status = str(row["sched_status"])
 
+        if cur_sched_status == "UNKNOWN_RESULT":
+            trace.append("ABORT: Scheduled post is in UNKNOWN_RESULT state; human verification required.")
+            return self._record_attempt(
+                attempt_id=attempt_id,
+                scheduled_post_id=scheduled_post_id,
+                page_id=page_id,
+                dry_run=dry_run,
+                status="UNKNOWN_RESULT",
+                taxonomy="UNKNOWN_RESULT",
+                trace=trace,
+                started_at=started_at,
+                screenshot_path=None,
+                permalink=None,
+            )
+
         # SAFETY: This release contains a DOM-state simulator, not a real Playwright
         # browser integration. Never treat its trace messages as evidence of a
         # Facebook upload or publication. In normal operation fail closed.
@@ -224,21 +239,6 @@ class MetaBusinessSuitePlaywrightPublisher:
                 dry_run=True,
                 status="BLOCKED",
                 taxonomy="SIMULATION_DISABLED",
-                trace=trace,
-                started_at=started_at,
-                screenshot_path=None,
-                permalink=None,
-            )
-
-        if cur_sched_status == "UNKNOWN_RESULT":
-            trace.append("ABORT: Scheduled post is in UNKNOWN_RESULT state; human verification required.")
-            return self._record_attempt(
-                attempt_id=attempt_id,
-                scheduled_post_id=scheduled_post_id,
-                page_id=page_id,
-                dry_run=dry_run,
-                status="UNKNOWN_RESULT",
-                taxonomy="UNKNOWN_RESULT",
                 trace=trace,
                 started_at=started_at,
                 screenshot_path=None,
