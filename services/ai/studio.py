@@ -59,6 +59,12 @@ class CreativePlan(BaseModel):
     background_hex: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
     audio_style: str = Field(min_length=3, max_length=160)
     motion_note: str = Field(min_length=5, max_length=350)
+    # Gemini may customize the actual compositor timing rather than merely
+    # write a motion description; bounded values protect renderer stability.
+    cycles: int = Field(default=5, ge=2, le=9)
+    offset_distance_px: int = Field(default=165, ge=80, le=340)
+    hold_ratio: float = Field(default=0.14, ge=0.05, le=0.28)
+    object_count: int = Field(default=5, ge=3, le=8)
     template: Template
 
 
@@ -167,6 +173,8 @@ class GeminiCreativeStudio:
             "Provide a precise image_prompt to feed into a separate image-generation call. "
             "Don't make unsupported claims or fabricated statistics. "
             "Make narrator instructions friendly and understandable. "
+            "Set bounded cycles, hold_ratio, object_count and offset_distance_px "
+            "to art-direct a distinctive animation rhythm for this puzzle. "
             "Respond exactly to the supplied structured output schema. "
             "Do not include script stage directions in narration.\n"
             f"Creative brief: {brief.model_dump_json()}"
