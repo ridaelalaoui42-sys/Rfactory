@@ -4,6 +4,7 @@ Facebook Publishing Adapters for Animal Puzzle Reels Factory (Playwright / Brows
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import uuid
 from dataclasses import dataclass
@@ -193,6 +194,41 @@ class MetaBusinessSuitePlaywrightPublisher:
 
         page_id = str(row["page_id"])
         cur_sched_status = str(row["sched_status"])
+
+        # SAFETY: This release contains a DOM-state simulator, not a real Playwright
+        # browser integration. Never treat its trace messages as evidence of a
+        # Facebook upload or publication. In normal operation fail closed.
+        if simulated_dom_state is None:
+            trace.append(
+                "BROWSER_WORKFLOW_UNIMPLEMENTED: No browser was opened, no upload "
+                "occurred, and no publish action was performed. Use manual export."
+            )
+            return self._record_attempt(
+                attempt_id=attempt_id,
+                scheduled_post_id=scheduled_post_id,
+                page_id=page_id,
+                dry_run=True,
+                status="BLOCKED",
+                taxonomy="BROWSER_WORKFLOW_UNIMPLEMENTED",
+                trace=trace,
+                started_at=started_at,
+                screenshot_path=None,
+                permalink=None,
+            )
+        if os.environ.get("RFACTORY_ALLOW_TEST_SIMULATION") != "1":
+            trace.append("SIMULATION_DISABLED: Test DOM input rejected outside isolated tests.")
+            return self._record_attempt(
+                attempt_id=attempt_id,
+                scheduled_post_id=scheduled_post_id,
+                page_id=page_id,
+                dry_run=True,
+                status="BLOCKED",
+                taxonomy="SIMULATION_DISABLED",
+                trace=trace,
+                started_at=started_at,
+                screenshot_path=None,
+                permalink=None,
+            )
 
         if cur_sched_status == "UNKNOWN_RESULT":
             trace.append("ABORT: Scheduled post is in UNKNOWN_RESULT state; human verification required.")
