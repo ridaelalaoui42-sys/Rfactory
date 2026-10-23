@@ -70,6 +70,7 @@
   function updateButtons() {
     byId("image-btn").disabled = !state.plan;
     byId("voice-btn").disabled = !state.plan;
+    byId("refine-btn").disabled = !state.image;
     byId("approve-btn").disabled = !state.image || state.image.status === "APPROVED";
     byId("render-btn").disabled = !state.plan || !state.image || state.image.status !== "APPROVED";
   }
@@ -141,6 +142,23 @@
     message("AI artwork generated successfully. Review it before rendering.", "ok");
     output("Artwork is awaiting manual approval. Provider: " + state.image.provider);
     updateButtons();
+  });
+  handle(byId("refine-btn"), "Refining artwork...", async () => {
+    if (!state.image || !state.plan) throw Error("Generate original artwork first.");
+    const sourceId = state.image.id;
+    state.image = await request("POST", "/images", {
+      plan_id: state.plan.id,
+      source_image_id: sourceId,
+      prompt: byId("edit-prompt").value,
+      style: byId("style").value,
+      model: byId("image-model").value,
+      transparent_subject: true,
+    });
+    activatePreview("image", await protectedMedia(state.image.media_url));
+    byId("download").hidden = true;
+    byId("art-status").textContent = "New Gemini image revision is ready for visual inspection. Approval reset.";
+    message("Artwork revised. Review and approve this new version before rendering.", "ok");
+    output("Revision generated from artwork " + sourceId.slice(0, 8) + ". Previous version remains saved.");
   });
   handle(byId("voice-btn"), "Generating Gemini narration...", async () => {
     if (!state.plan) throw Error("Create a storyboard first.");
