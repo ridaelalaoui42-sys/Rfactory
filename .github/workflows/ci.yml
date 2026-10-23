@@ -35,16 +35,9 @@ jobs:
           ffprobe -version | head -1
       - name: Check Python syntax
         run: python -m compileall -q services tests scripts
-      - name: Run portable unit and release-safety tests
-        run: |
-          python -m unittest -v \
-            tests.test_factory.AnimalPuzzleReelsFactoryTests.test_01_asset_generation_and_deduplication \
-            tests.test_factory.AnimalPuzzleReelsFactoryTests.test_02_segmentation_and_mask_validation \
-            tests.test_factory.AnimalPuzzleReelsFactoryTests.test_03_missing_piece_pixel_perfect_alignment \
-            tests.test_factory.AnimalPuzzleReelsFactoryTests.test_04_animation_template_displacement_and_loop \
-            tests.test_factory.AnimalPuzzleReelsFactoryTests.test_07_crash_recovery_and_fault_isolation \
-            tests.test_factory.AnimalPuzzleReelsFactoryTests.test_08_scheduling_timezone_and_daily_cap \
-            tests.test_factory.AnimalPuzzleReelsFactoryTests.test_10_mock_business_suite_fixture_and_content_agent
-          python -m unittest discover -s tests -p 'test_release_safety.py' -v
+      - name: Run complete self-contained test suite
+        run: python -m unittest discover -s tests -v
+      - name: Verify bootstrap does not need release database
+        run: python -m scripts.bootstrap_factory
       - name: Render a real 1080x1920 MP4 and validate it
         run: python -m scripts.smoke_render
