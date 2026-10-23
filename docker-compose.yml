@@ -1,43 +1,22 @@
-version: "3.9"
-
+# Working local API deployment. Uses SQLite today; PostgreSQL migration
+# and a separate web/Playwright worker are NOT implemented in this release.
 services:
-  postgres:
-    image: postgres:16-alpine
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-puzzle_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_local_only}
-      POSTGRES_DB: ${POSTGRES_DB:-animal_puzzle_factory}
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./services/database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
-
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    restart: unless-stopped
-    env_file: .env.example
+      RFACTORY_API_TOKEN: ${RFACTORY_API_TOKEN:?Set a strong RFACTORY_API_TOKEN in your environment}
+      SQLITE_DB_PATH: /app/storage/factory.db
+      BROWSER_AUTOMATION_ENABLED: "false"
+      LIVE_PUBLISH_ENABLED: "false"
     volumes:
       - ./storage:/app/storage
-    depends_on:
-      - postgres
-
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-      - "8000:8000"
-    env_file: .env.example
-    volumes:
-      - ./storage:/app/storage
-    depends_on:
-      - worker
-
-volumes:
-  pgdata:
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
