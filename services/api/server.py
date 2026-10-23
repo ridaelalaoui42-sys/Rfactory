@@ -6,10 +6,13 @@ Asset Library, Video Library approval/scheduling, Page Connections, and Audit Lo
 from __future__ import annotations
 
 import json
+import hmac
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 import services
@@ -25,7 +28,30 @@ from services.worker.batch_runner import BatchProductionWorker
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 STORAGE_ROOT = REPO_ROOT / "storage"
 
-app = FastAPI(title="Animal Puzzle Reels Factory API", version="1.0.0")
+app = FastAPI(title="Animal Puzzle Reels Factory API", version="1.0.1")
+
+
+@app.middleware("http")
+async def protect_api(request: Request, call_next):
+    """Require a bearer token for all non-health API routes.
+
+    Local-only development may run without a token; non-loopback requests
+    are denied unless RFACTORY_API_TOKEN is configured. Do not publish an
+    unauthenticated management API to the internet.
+    """
+    if request.url.path.startswith("/api/") and request.url.path != "/api/health":
+        token = os.environ.get("RFACTORY_API_TOKEN", "")
+        if token:
+            provided = request.headers.get("authorization", "")
+            if not hmac.compare_digest(provided, f"Bearer {token}"):
+                return JSONResponse(status_code=401, content={"detail": "Authentication required"})
+        elif not request.client or request.client.host not in {"127.0.0.1", "::1"}:
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "Set RFACTORY_API_TOKEN before remote API access"},
+            )
+    return await call_next(request)
+
 
 
 def get_repo() -> FactoryRepository:
