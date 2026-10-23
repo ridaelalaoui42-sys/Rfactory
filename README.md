@@ -93,3 +93,24 @@ Do not post without verifying rights for any bundled artwork: some metadata refe
 - [Prioritized technical audit](docs/PRODUCTION_AUDIT.md)
 
 The protected `main` branch remains unchanged until the reviewed pull request is merged.
+
+## AI Creative Studio (experimental, opt-in)
+
+This branch now includes a **real Gemini service adapter** and a mobile-first creative workflow at `http://127.0.0.1:8000/studio`.
+
+Capabilities: structured Gemini storyboards, Nano Banana 2.1 image generation and revisions, selectable Gemini TTS narration, alpha-cutout QA, 1080×1920 Reels built using unique AI assets, optional audio mixing, artwork approval, local asset library and media playback/download. Automated tests use mocked Gemini responses; **live billing/authentication still requires your own valid Gemini API key**.
+
+```bash
+pip install -r requirements-ai.txt
+# Enable explicitly; NEVER place your provider key in the browser or Android client.
+export RFACTORY_AI_ENABLED=true
+export GEMINI_API_KEY='YOUR_KEY'
+export RFACTORY_API_TOKEN='LONG_RANDOM_SECRET'
+python -m scripts.bootstrap_factory
+uvicorn services.api.server:app --host 127.0.0.1 --port 8000
+```
+
+Open `/studio` and paste the backend token. Begin with a creative brief, generate an AI storyboard, refine unique artwork, preview the WAV narration and approve the image before video generation. No automatic Facebook publishing occurs.
+
+See [AI Studio documentation and Android plan](docs/AI_STUDIO_AND_ANDROID_PLAN.md). The API at `/api/v1/ai` intentionally separates Gemini credentials and FFmpeg workers from the frontend; `/openapi.json` can later support Capacitor or native Kotlin/Compose Android clients.
+
