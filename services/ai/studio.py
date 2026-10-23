@@ -17,6 +17,7 @@ import numpy as np
 from PIL import Image
 from pydantic import BaseModel, Field, ConfigDict
 
+from services.engine.motion_profiles import MotionName, MOTION_PROFILES
 from services.assets.segmentation import (
     remove_white_background_to_rgba,
     validate_alpha_mask,
@@ -59,6 +60,7 @@ class CreativePlan(BaseModel):
     background_hex: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
     audio_style: str = Field(min_length=3, max_length=160)
     motion_note: str = Field(min_length=5, max_length=350)
+    motion_profile: MotionName = "orbit_lock"
     # Gemini may customize the actual compositor timing rather than merely
     # write a motion description; bounded values protect renderer stability.
     cycles: int = Field(default=5, ge=2, le=9)
@@ -175,6 +177,9 @@ class GeminiCreativeStudio:
             "Make narrator instructions friendly and understandable. "
             "Set bounded cycles, hold_ratio, object_count and offset_distance_px "
             "to art-direct a distinctive animation rhythm for this puzzle. "
+            "Select the most fitting motion_profile for the scene from these eight: "
+            + ", ".join(MOTION_PROFILES) + ". Avoid repetitive plain sliding; "
+            "prefer rotational and dynamic motion profiles where visually appropriate. "
             "Respond exactly to the supplied structured output schema. "
             "Do not include script stage directions in narration.\n"
             f"Creative brief: {brief.model_dump_json()}"
