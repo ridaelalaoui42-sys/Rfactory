@@ -1,0 +1,13 @@
+# Core video / asset processing dependencies
+numpy>=1.26,<3
+opencv-python-headless>=4.10,<5
+Pillow>=10.4,<13
+
+# Backend (no database driver: current repository uses sqlite3)
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+pydantic>=2.9,<3
+
+# Playwright is deliberately NOT installed here: this release only has a
+# browser-state simulator, not a working Playwright integration.
+# Add playwright with tested locators/browser provisioning when implementing it.
