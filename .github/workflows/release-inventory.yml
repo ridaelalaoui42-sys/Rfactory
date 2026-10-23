@@ -1,0 +1,39 @@
+name: Inspect Rfactory release archive
+
+on:
+  push:
+    branches:
+      - codex/rfactory-release-import-audit
+    paths:
+      - .github/workflows/release-inventory.yml
+      - scripts/inventory_release.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Download exact release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/rfactory-release
+          gh release download Repo --repo "$GITHUB_REPOSITORY" --pattern 'Apf.zip' --dir /tmp/rfactory-release --clobber
+      - name: Verify digest, CRC, and inventory file list
+        run: python3 scripts/inventory_release.py /tmp/rfactory-release/Apf.zip
+      - name: Commit inventory to audit branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/RELEASE_ARCHIVE_INVENTORY.md
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: verified release ZIP inventory [skip ci]"
+            git push origin HEAD:codex/rfactory-release-import-audit
+          fi
