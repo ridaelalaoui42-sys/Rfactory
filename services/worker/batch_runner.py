@@ -54,6 +54,12 @@ class BatchProductionWorker:
             base_seed=base_seed,
         )
         job_ids: List[str] = []
+        # Deterministic per-job choreography variety. No two adjacent videos in
+        # a typical campaign need share a generic slide animation.
+        motion_palette = (
+            "orbit_lock", "spin_snap", "pendulum", "spiral",
+            "flip_reveal", "elastic", "zigzag",
+        )
         for idx, idea in enumerate(ideas):
             cfg = RenderConfig(
                 job_id=f"batch_{batch_id}_{idx+1:02d}_{idea.species}",
@@ -71,6 +77,8 @@ class BatchProductionWorker:
                 hold_ratio=idea.hold_ratio,
                 slice_x_ratio=idea.slice_x_ratio,
                 enable_audio=enable_audio,
+                motion_profile=motion_palette[(idx + base_seed) % len(motion_palette)],
+                motion_intensity=0.95 + (idx % 3) * 0.15,
             )
             asset_prefix = (
                 "celebrity_face"
