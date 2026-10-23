@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 270" width="220" height="270">
+  <defs>
+    <radialGradient id="eggGrad_2001" cx="38%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#FFF8EE"/>
+      <stop offset="65%" stop-color="rgb(234,214,184)"/>
+      <stop offset="100%" stop-color="rgb(189,169,139)"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="110.0" cy="143.1" rx="85.8" ry="113.4" fill="url(#eggGrad_2001)" stroke="#3A2818" stroke-width="2"/>
+</svg>
