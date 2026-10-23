@@ -113,6 +113,24 @@ def _decode_payload(encoded: str | bytes, limit: int) -> bytes:
     return blob
 
 
+def provider_json_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Use the portable Gemini JSON-Schema subset; validate full rules locally.
+
+    Pydantic emits minLength, pattern, defaults and other validation keywords
+    that can vary across provider model versions. Removing them here prevents
+    avoidable schema-level API rejection while keeping strict model validation
+    on every returned JSON document.
+    """
+    safe = {"type", "properties", "required", "items", "description", "enum", "anyOf"}
+    def walk(obj):
+        if isinstance(obj, list):
+            return [walk(v) for v in obj]
+        if isinstance(obj, dict):
+            return {key: walk(value) for key, value in obj.items() if key in safe}
+        return obj
+    return walk(schema)
+
+
 class GeminiCreativeStudio:
     """Stable provider boundary for backend and future Android REST consumers.
 
@@ -159,7 +177,7 @@ class GeminiCreativeStudio:
             response_format={
                 "type": "text",
                 "mime_type": "application/json",
-                "schema": CreativePlan.model_json_schema(),
+                "schema": provider_json_schema(CreativePlan.model_json_schema()),
             },
         )
         raw = getattr(response, "output_text", None)
