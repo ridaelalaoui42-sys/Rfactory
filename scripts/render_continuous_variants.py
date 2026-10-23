@@ -138,7 +138,7 @@ def make_artwork(name: str, destination: Path) -> None:
 SHOWCASE = (
     ("snow_leopard", "MISSING_PIECE_SLIDE", "orbit_lock", "#E8F2FA", 42001),
     ("red_panda", "FACE_FEATURE_SLIDE", "pendulum", "#FFF3E5", 42002),
-    ("astronaut", "FACE_SPLIT_3BAND", "spiral", "#E9F1FF", 42003),
+    ("astronaut", "MISSING_PIECE_SLIDE", "spiral", "#E9F1FF", 42003),
 )
 
 
