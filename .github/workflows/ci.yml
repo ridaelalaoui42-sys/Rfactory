@@ -43,3 +43,12 @@ jobs:
         run: python -m scripts.run_batch --count 2 --duration 2 --template ALL
       - name: Render a real 1080x1920 MP4 and validate it
         run: python -m scripts.smoke_render
+      - name: Preserve playable sample Reels for PR review
+        uses: actions/upload-artifact@v4
+        with:
+          name: rfactory-sample-reels
+          path: |
+            storage/renders/**/*.mp4
+            storage/renders/**/*_thumb.png
+          if-no-files-found: error
+          retention-days: 7
