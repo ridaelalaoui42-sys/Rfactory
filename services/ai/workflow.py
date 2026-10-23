@@ -363,6 +363,7 @@ class StudioWorkflow:
             motion_profile=selected_motion,
             motion_intensity=motion_intensity,
             randomize_snap_timing=True,
+            continuous_motion=True,
             snap_count=snap_count,
         )
         artifact = renderer.render_video(configuration)
@@ -384,7 +385,9 @@ class StudioWorkflow:
             "motion_profile": selected_motion,
             "motion_intensity": motion_intensity,
             "snap_count": snap_count or int(creative.get("cycles", 5)),
-            "timing_mode": "seeded_irregular",
+            "timing_mode": "seeded_irregular_continuous",
+            "continuous_motion": True,
+            "hold_frames_per_match": 1,
             "status": "READY_FOR_REVIEW",
             "created_at": utc_now(),
             "qa": {"passed": qa.passed, "duration_sec": qa.duration_sec, "codec": qa.video_codec},
