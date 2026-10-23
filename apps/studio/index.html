@@ -69,6 +69,17 @@
               <option value="zigzag">Zigzag ricochet</option>
               <option value="slide">Classic slide</option>
             </select>
+            <label for="snap-count">Exact-fit moments throughout the video</label>
+            <select id="snap-count">
+              <option value="0">✦ Gemini chooses the count · irregular timing</option>
+              <option value="3">3 surprise matches</option>
+              <option value="4">4 surprise matches</option>
+              <option value="5" selected>5 surprise matches</option>
+              <option value="6">6 surprise matches</option>
+              <option value="7">7 surprise matches</option>
+              <option value="8">8 surprise matches</option>
+            </select>
+            <p class="helper">Each match lasts briefly and occurs at a seeded, irregular moment—not only at the end. The same source pixels lock perfectly into place every time.</p>
             <label for="motion-intensity">Movement intensity <output id="motion-value">1.0×</output></label>
             <input type="range" id="motion-intensity" min="0.3" max="2.0" step="0.1" value="1.0">
             <label class="check-row" for="sfx-enabled"><input type="checkbox" id="sfx-enabled" checked> Mix puzzle sound effects with narration</label><button class="btn primary full" id="render-btn" disabled>▶ Render final 9:16 Reel</button>
