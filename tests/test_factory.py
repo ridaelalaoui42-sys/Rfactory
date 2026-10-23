@@ -10,6 +10,7 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -251,13 +252,14 @@ class AnimalPuzzleReelsFactoryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 repo.approve_and_schedule_project(proj_ids[2], "pg_atlas_wildlife", "2026-10-25T21:00:00", "Africa/Casablanca")
 
+    @patch.dict("os.environ", {"RFACTORY_ALLOW_TEST_SIMULATION": "1"})
     def test_09_publisher_safety_taxonomy_and_unknown_result_quarantine(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             repo = FactoryRepository(db_path=tmp_path / "test_pub.db")
             repo.seed_defaults(tmp_path / "profiles")
             with repo._connect() as conn:
-                conn.execute("UPDATE facebook_pages SET browser_publishing_enabled = 1 WHERE id = 'pg_atlas_wildlife'")
+                conn.execute("UPDATE facebook_pages SET browser_publishing_enabled = 1, session_status = 'CONNECTED' WHERE id = 'pg_atlas_wildlife'")
 
             repo.register_asset(
                 asset_id="animal_donkey",
@@ -292,8 +294,12 @@ class AnimalPuzzleReelsFactoryTests(unittest.TestCase):
             repo.transition_render_job(jid, "QA")
             repo.transition_render_job(jid, "READY")
 
-            out_mp4 = REPO_ROOT.parent / "artifacts/file_generation/ttl=63d/output/sample_template_b_missing_piece.mp4"
-            thumb_png = self.renders_root / "job_9105fabefc_donkey/job_9105fabefc_donkey_thumb.png"
+            # These are database/publishing state tests, not video-decoding tests:
+            # an isolated placeholder file avoids expired absolute fixture paths.
+            out_mp4 = tmp_path / "mock_video.mp4"
+            thumb_png = tmp_path / "mock_thumbnail.png"
+            out_mp4.write_bytes(b"test-only-file")
+            thumb_png.write_bytes(b"test-only-image")
             repo.record_render_output(
                 job_id=jid,
                 project_id=pid,
