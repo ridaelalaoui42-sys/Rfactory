@@ -214,6 +214,37 @@ class StudioWorkflow:
         self.store.write_metadata("plan", key, meta)
         return meta
 
+    def import_image(self, content: bytes, plan_id: str | None = None) -> dict[str, Any]:
+        """Use owned/licensed local artwork without paid Gemini image generation.
+
+        A gallery/camera upload is immediately segmented and still requires
+        operator approval. Does not consume AI quota or make provider calls.
+        """
+        if not content or len(content) > 10 * 1024 * 1024:
+            raise ValueError("Image upload must be between 1 byte and 10 MB")
+        if plan_id:
+            self.store.read_metadata("plan", plan_id)
+        key = uuid.uuid4().hex
+        path = self.store._path("image", key)
+        qa = prepare_subject(content, path)
+        meta = {
+            "id": key,
+            "kind": "image",
+            "plan_id": plan_id,
+            "source_image_id": None,
+            "provider": "user_upload",
+            "model": None,
+            "status": "AWAITING_APPROVAL",
+            "created_at": utc_now(),
+            "prompt": None,
+            "style": "user_supplied",
+            "qa": qa,
+            "provenance": "Operator-uploaded media; rights must be confirmed before publishing",
+            "media_url": f"/api/v1/ai/media/image/{key}",
+        }
+        self.store.write_metadata("image", key, meta)
+        return meta
+
     def image(self, brief: ImageBrief, plan_id: str | None = None, source_image_id: str | None = None) -> dict[str, Any]:
         if plan_id:
             self.store.read_metadata("plan", plan_id)
