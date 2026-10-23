@@ -44,7 +44,8 @@
             <label for="voice-script">Narration transcript</label><textarea id="voice-script" rows="3"></textarea>
             <div class="grid-two">
               <div><label for="image-model">Image model</label><select id="image-model"><option value="gemini-nano-banana-2.1">Nano Banana 2.1</option><option value="gemini-3.1-flash-lite-image">Nano Banana Lite</option><option value="gemini-3-pro-image">Nano Banana Pro</option></select></div>
-              <div><label for="tts-voice">TTS character</label><select id="tts-voice"><option>Kore</option><option>Puck</option><option>Aoede</option><option>Charon</option><option>Fenrir</option></select></div>
+              <div><label for="tts-voice">TTS character</label><select id="tts-voice"><option>Kore</option><option>Puck</option><option>Aoede</option><option>Charon</option><option>Fenrir</option></select></div><div><label for="tts-model">Voice model</label><select id="tts-model"><option value="gemini-3.8-flash-lite-tts">Flash-Lite · efficient</option><option value="gemini-3.8-flash-tts">Flash · studio quality</option></select></div>
+              <div><label for="voice-style">Narration delivery</label><input id="voice-style" value="Bright, playful and intriguing" maxlength="160"></div>
             </div>
             <div class="btn-row"><button class="btn primary" id="image-btn">✦ Generate original art</button><button class="btn outline" id="voice-btn">◉ Generate voiceover</button></div>
           </div>
@@ -52,7 +53,7 @@
             <div class="panel-top"><span class="step">03</span><div><h2>Production & review</h2><p>AI-generated work requires inspection before video rendering.</p></div></div>
             <div id="art-status" class="muted">No artwork yet.</div><label for="edit-prompt">Refine existing artwork with Gemini</label><input id="edit-prompt" maxlength="1800" value="Improve the fine texture, shading and silhouette while preserving the character identity"><button class="btn outline full" id="refine-btn" disabled>✧ Edit this image with Nano Banana</button>
             <button class="btn outline full" id="approve-btn" disabled>✓ Approve image for production</button>
-            <button class="btn primary full" id="render-btn" disabled>▶ Render final 9:16 Reel</button>
+            <label class="check-row" for="sfx-enabled"><input type="checkbox" id="sfx-enabled" checked> Mix puzzle sound effects with narration</label><button class="btn primary full" id="render-btn" disabled>▶ Render final 9:16 Reel</button>
             <div class="helper">The video is rendered on your server. No Facebook publishing occurs automatically.</div>
           </div>
         </section>
