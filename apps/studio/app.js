@@ -134,9 +134,9 @@
     byId("plan-title").textContent = creative.title;
     byId("plan-hook").textContent = creative.hook;
     byId("motion-direction").textContent =
-      "AI motion design: " + (creative.motion_note || "Seamless puzzle motion") +
-      " · " + (creative.cycles || 5) + " cycles · " +
-      (creative.offset_distance_px || 165) + "px movement";
+      "Gemini-chosen movement: " + (creative.motion_profile || "orbit_lock") +
+      " · " + (creative.motion_note || "Puzzle motion") +
+      " · " + (creative.cycles || 5) + " cycles";
     byId("image-prompt").value = creative.image_prompt;
     byId("voice-script").value = creative.narration;
     byId("storyboard-panel").hidden = false;
@@ -224,6 +224,8 @@
       voice_id: state.voice ? state.voice.id : null,
       duration_sec: Number(byId("duration").value),
       sfx_enabled: byId("sfx-enabled").checked,
+      motion_profile: byId("motion-profile").value || null,
+      motion_intensity: Number(byId("motion-intensity").value),
     });
     const url = await protectedMedia(state.render.media_url);
     activatePreview("video", url);
@@ -233,6 +235,9 @@
     output("Video QA passed · " + state.render.qa.duration_sec + "s · " +
       state.render.qa.codec.toUpperCase() + ". Ready for review. NOT PUBLISHED.");
     message("Your AI-powered puzzle Reel has rendered successfully!", "ok");
+  });
+  byId("motion-intensity").addEventListener("input", () => {
+    byId("motion-value").textContent = Number(byId("motion-intensity").value).toFixed(1) + "×";
   });
   updateButtons();
   window.addEventListener("pagehide", () => {
