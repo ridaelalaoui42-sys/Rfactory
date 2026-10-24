@@ -3,7 +3,8 @@
 (() => {
   "use strict";
   const byId = (id) => document.getElementById(id);
-  const state = { token: "", plan: null, image: null, voice: null, render: null, urls: [] };
+  const state = { token: "", plan: null, image: null, voice: null, render: null,
+    selectedLibrary: null, libraryItems: [], urls: [] };
   const apiBase = "/api/v1/ai";
 
   function message(text, category = "") {
@@ -52,6 +53,91 @@
     if (!response.ok) throw Error(body.detail || "Artwork import failed");
     return body;
   }
+  async function libraryRequest(method, path, payload) {
+    if (!state.token) throw Error("Connect your Rfactory backend first.");
+    const headers = {Authorization: "Bearer " + state.token};
+    if (payload !== undefined) headers["Content-Type"] = "application/json";
+    const response = await fetch("/api/v1/library" + path, {
+      method, headers, cache:"no-store",
+      body: payload === undefined ? undefined : JSON.stringify(payload),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw Error(result.detail || "Asset library request failed");
+    return result;
+  }
+  function refreshLibraryControls() {
+    const asset = state.selectedLibrary;
+    byId("library-approve-btn").disabled =
+      !asset || !asset.production_eligible || asset.approved;
+    byId("library-stage-btn").disabled =
+      !asset || !asset.production_eligible || !asset.approved ||
+      !state.plan || !byId("library-rights").checked;
+  }
+  async function loadArtworkLibrary() {
+    const category = byId("library-category").value;
+    const productionOnly = byId("library-quality").value === "production";
+    const result = await libraryRequest("GET",
+      "/assets?category=" + encodeURIComponent(category) +
+      "&production_only=" + (productionOnly ? "true" : "false") + "&limit=100");
+    state.libraryItems = result.items;
+    const grid = byId("library-grid");
+    grid.replaceChildren();
+    state.selectedLibrary = null;
+    byId("library-selection").textContent = "Choose an image to inspect source and quality.";
+    const records = result.items.slice(0, 24);
+    byId("library-status").textContent =
+      result.items.length + " matching images · " +
+      result.items.filter(item => item.production_eligible).length +
+      " HD candidates · " + records.length + " previews displayed";
+    for (const item of records) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "library-tile";
+      card.setAttribute("aria-label", "Select " + item.subject);
+      const image = document.createElement("img");
+      image.alt = item.subject;
+      image.loading = "lazy";
+      const title = document.createElement("strong");
+      title.textContent = item.subject;
+      const badge = document.createElement("small");
+      badge.textContent = item.production_eligible
+        ? (item.is_fallback ? "FALLBACK · HD" : "HD · " + item.tier)
+        : "REFERENCE ONLY";
+      card.append(image, title, badge);
+      card.addEventListener("click", () => {
+        state.selectedLibrary = item;
+        grid.querySelectorAll(".library-tile").forEach(el => el.classList.remove("selected"));
+        card.classList.add("selected");
+        byId("library-selection").textContent =
+          item.subject + " · " + item.width + "×" + item.height +
+          " · " + item.provenance + " · " + item.review_status +
+          (item.is_fallback ? " · explicit fallback artwork" : "") +
+          (item.production_eligible ? "" : " · not usable in a final Reel");
+        refreshLibraryControls();
+      });
+      grid.append(card);
+      // Protected blob URLs: never expose an administrator bearer token in src.
+      protectedMedia(item.media_url).then(url => {
+        if (card.isConnected) image.src = url;
+      }).catch(() => { badge.textContent += " · preview unavailable"; });
+    }
+    refreshLibraryControls();
+  }
+  async function importArtworkPack(file) {
+    if (!state.token) throw Error("Connect first.");
+    if (!file || file.size > 60 * 1024 * 1024) {
+      throw Error("Select a valid Rfactory ZIP under 60 MB.");
+    }
+    const data = new FormData();
+    data.append("file", file, file.name);
+    const response = await fetch("/api/v1/library/import-pack", {
+      method:"POST", headers:{Authorization:"Bearer " + state.token},
+      body:data, cache:"no-store",
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw Error(body.detail || "Artwork-pack import failed");
+    return body;
+  }
   async function protectedMedia(relativeUrl) {
     const response = await fetch(relativeUrl, {
       headers: { Authorization: "Bearer " + state.token }, cache: "no-store",
@@ -88,6 +174,7 @@
     byId("refine-btn").disabled = !state.image;
     byId("approve-btn").disabled = !state.image || state.image.status === "APPROVED";
     byId("render-btn").disabled = !state.plan || !state.image || state.image.status !== "APPROVED";
+    refreshLibraryControls();
   }
   function resetFromPlan() {
     state.image = null;
@@ -101,14 +188,59 @@
     byId("art-status").textContent = "Generate unique AI artwork using the director's prompt.";
     updateButtons();
   }
+  handle(byId("library-import-btn"), "Importing artwork ZIP...", async () => {
+    const file = byId("library-pack-file").files[0];
+    const result = await importArtworkPack(file);
+    message("Installed " + result.imported + " assets: " +
+      result.production_candidates + " HD candidates, " +
+      result.reference_only + " preview-only references. Review before use.", "ok");
+    await loadArtworkLibrary();
+  });
+  handle(byId("library-refresh-btn"), "Refreshing...", async () => {
+    await loadArtworkLibrary();
+  });
+  byId("library-category").addEventListener("change", () => {
+    loadArtworkLibrary().catch(error => message(error.message, "error"));
+  });
+  byId("library-quality").addEventListener("change", () => {
+    loadArtworkLibrary().catch(error => message(error.message, "error"));
+  });
+  byId("library-rights").addEventListener("change", refreshLibraryControls);
+  handle(byId("library-approve-btn"), "Reviewing HD asset...", async () => {
+    if (!state.selectedLibrary) throw Error("Select a production-quality asset.");
+    const record = await libraryRequest("POST",
+      "/assets/" + state.selectedLibrary.id + "/approve");
+    state.selectedLibrary = record;
+    message("Approved " + record.subject + " as a vetted original artwork source.", "ok");
+    await loadArtworkLibrary();
+  });
+  handle(byId("library-stage-btn"), "Preparing artwork for Reel...", async () => {
+    if (!state.selectedLibrary || !state.plan || !byId("library-rights").checked) {
+      throw Error("Select an approved HD image, create a storyboard and confirm artwork rights.");
+    }
+    const result = await libraryRequest("POST",
+      "/assets/" + state.selectedLibrary.id + "/stage", {
+        plan_id: state.plan.id, acknowledge_source_license: true
+      });
+    state.image = result;
+    activatePreview("image", await protectedMedia(state.image.media_url));
+    byId("production-panel").hidden = false;
+    byId("art-status").textContent =
+      "Library asset staged: " + (result.fallback_used ? "EXPLICIT FALLBACK" : "approved original") +
+      " · image approval required before rendering.";
+    message("Artwork staged from the library; no Gemini image generation was claimed.", "ok");
+    output("Review the art and approve the staged image to render this puzzle.");
+    updateButtons();
+  });
   handle(byId("connect"), "Connecting...", async () => {
     const token = byId("api-token").value.trim();
     if (!token) throw Error("Enter your backend access token.");
     state.token = token;
     const caps = await request("GET", "/capabilities");
     if (!caps.ai_enabled || !caps.configured) {
-      message("The backend is reachable, but Gemini is disabled or has no server-side API key.", "error");
-      output("Set RFACTORY_AI_ENABLED=true and configure GEMINI_API_KEY on the server.");
+      message("Connected to Rfactory asset library. Gemini is unavailable; browsing, uploading and reviewing artwork remain accessible.", "ok");
+      output("To generate a storyboard, enable Gemini on the backend. Asset importing does not need image-generation credits.");
+      await loadArtworkLibrary();
       return;
     }
     byId("connection-state").textContent = "Connected to Gemini-ready backend";
@@ -116,6 +248,7 @@
     message("Studio connected. Gemini image, storyboard and TTS capabilities are available.", "ok");
     byId("api-token").value = "";
     byId("api-token").placeholder = "Token loaded for this session";
+    await loadArtworkLibrary();
   });
   handle(byId("plan-btn"), "Directing with Gemini...", async () => {
     const brief = {
@@ -158,6 +291,7 @@
     message("Artwork imported locally without paid image generation.", "ok");
     output("Imported image ready for approval. Gemini image credits were not used.");
     updateButtons();
+    refreshLibraryControls();
   });
   handle(byId("image-btn"), "Generating Nano Banana artwork...", async () => {
     if (!state.plan) throw Error("Create a storyboard first.");
