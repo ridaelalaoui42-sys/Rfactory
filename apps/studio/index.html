@@ -88,6 +88,11 @@
                   <option value="portrait_cheek_patch">Portrait — cheek</option>
                 </select></div>
               </div>
+              <div class="face-roi-picker">
+                <p class="helper">Draw a rectangle around the real eyes, nose and muzzle. For multi-piece human faces, select the whole face.</p>
+                <canvas id="face-roi-canvas" width="420" height="360" aria-label="Face region preview; drag pointer to select a face box"></canvas>
+                <p id="face-roi-status" class="helper">Choose a library image to edit its face region. Manual coordinate entry is also available.</p>
+              </div>
               <label for="face-manual-bbox">Optional reviewed face box — x, y, width, height (normalized 0–1)</label>
               <input id="face-manual-bbox" type="text" placeholder="e.g. 0.24, 0.12, 0.52, 0.48">
               <p class="helper">Human-face detection is automatic when possible. Animal positioning is an unverified estimate unless you enter a reviewed face box.</p>
