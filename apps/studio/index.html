@@ -62,6 +62,46 @@
               <button class="btn outline" id="library-approve-btn" disabled>✓ Approve HD asset</button>
               <button class="btn primary" id="library-stage-btn" disabled>Use selected artwork</button>
             </div>
+            <div class="library-direct-render">
+              <h3>Produce Reel without Gemini</h3>
+              <p class="helper">Render an approved original or explicitly selected HD fallback directly. No storyboard credits needed.</p>
+              <div class="grid-two">
+                <div><label for="library-motion">Movement</label><select id="library-motion">
+                  <option value="orbit_lock">Orbital rotation</option>
+                  <option value="helix">Helical 3D style</option>
+                  <option value="bezier_sweep">Curved Bézier sweep</option>
+                  <option value="figure_eight">Figure-eight</option>
+                  <option value="spiral">Cinematic spiral</option>
+                  <option value="pendulum">Pendulum swing</option>
+                  <option value="opposed_spin">Reverse rotation</option>
+                </select></div>
+                <div><label for="library-cutout">Fragment shape</label><select id="library-cutout">
+                  <option value="organic">Organic cutout</option>
+                  <option value="jigsaw">Jigsaw</option>
+                  <option value="ellipse">Ellipse</option>
+                  <option value="ring_sector">Ring sector</option>
+                  <option value="hexagon">Hexagon</option>
+                  <option value="curved_band">Curved band</option>
+                </select></div>
+                <div><label for="library-duration">Duration</label><select id="library-duration">
+                  <option value="10" selected>10 seconds</option>
+                  <option value="12">12 seconds</option>
+                  <option value="15">15 seconds</option>
+                </select></div>
+                <div><label for="library-fits">Exact crossings</label><select id="library-fits">
+                  <option value="4">4 crossings</option>
+                  <option value="5" selected>5 crossings</option>
+                  <option value="6">6 crossings</option>
+                </select></div>
+              </div>
+              <label class="check-row" for="library-sfx"><input type="checkbox" id="library-sfx" checked> Subtle sound at crossings only</label>
+              <button class="btn primary full" id="library-render-btn" disabled>▶ Render approved artwork into a Reel</button>
+              <div id="library-video-result" hidden>
+                <video id="library-video-player" controls playsinline preload="metadata" style="width:100%;border-radius:12px;margin-top:12px;"></video>
+                <a id="library-video-download" class="btn outline full" download="rfactory-reel.mp4">↓ Download finished MP4</a>
+                <p id="library-video-qa" class="helper"></p>
+              </div>
+            </div>
             <p class="helper">Fallback never means the Gemini image API succeeded. Nothing is silently substituted or published.</p>
           </div>
           <div class="panel" id="storyboard-panel" hidden>
