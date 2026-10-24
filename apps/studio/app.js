@@ -4,7 +4,7 @@
   "use strict";
   const byId = (id) => document.getElementById(id);
   const state = { token: "", plan: null, image: null, voice: null, render: null,
-    selectedLibrary: null, libraryItems: [], urls: [] };
+    selectedLibrary: null, selectedFaceCutout: null, libraryItems: [], urls: [] };
   const apiBase = "/api/v1/ai";
 
   function message(text, category = "") {
@@ -75,6 +75,9 @@
     byId("library-render-btn").disabled =
       !asset || !asset.production_eligible || !asset.approved ||
       !byId("library-rights").checked;
+    byId("face-generate-btn").disabled =
+      !asset || !asset.production_eligible || !asset.approved ||
+      !byId("library-rights").checked || !byId("face-clean-confirm").checked;
   }
   async function loadArtworkLibrary() {
     const category = byId("library-category").value;
@@ -86,6 +89,8 @@
     const grid = byId("library-grid");
     grid.replaceChildren();
     state.selectedLibrary = null;
+    state.selectedFaceCutout = null;
+    byId("face-cutout-results").hidden = true;
     byId("library-selection").textContent = "Choose an image to inspect source and quality.";
     const records = result.items.slice(0, 24);
     byId("library-status").textContent =
@@ -109,6 +114,8 @@
       card.append(image, title, badge);
       card.addEventListener("click", () => {
         state.selectedLibrary = item;
+        state.selectedFaceCutout = null;
+        byId("face-cutout-results").hidden = true;
         grid.querySelectorAll(".library-tile").forEach(el => el.classList.remove("selected"));
         card.classList.add("selected");
         byId("library-selection").textContent =
@@ -217,6 +224,80 @@
     message("Approved " + record.subject + " as a vetted original artwork source.", "ok");
     await loadArtworkLibrary();
   });
+  async function faceRequest(method, route, payload) {
+    if (!state.token) throw Error("Connect backend before creating cutouts.");
+    const headers={Authorization:"Bearer "+state.token};
+    if (payload !== undefined) headers["Content-Type"]="application/json";
+    const reply=await fetch("/api/v1/assets"+route,{
+      method,headers,cache:"no-store",
+      body:payload === undefined ? undefined : JSON.stringify(payload),
+    });
+    const body=await reply.json().catch(() => ({}));
+    if (!reply.ok) throw Error(body.detail || "Face asset request failed");
+    return body;
+  }
+  byId("face-clean-confirm").addEventListener("change", refreshLibraryControls);
+  byId("face-subject-type").addEventListener("change", () => {
+    const subject=byId("face-subject-type").value;
+    const options={
+      animal:"animal_face_core",
+      human:"human_three_slice_face",
+      portrait:"portrait_center_mask",
+    };
+    byId("face-mode").value=options[subject];
+  });
+  handle(byId("face-generate-btn"), "Cutting source image pixels...", async () => {
+    const asset=state.selectedLibrary;
+    if (!asset || !asset.approved || !asset.production_eligible)
+      throw Error("Approve an HD source image first.");
+    if (!byId("face-clean-confirm").checked)
+      throw Error("Confirm that the source artwork is intact (no AI-drawn cutouts).");
+    const raw=byId("face-manual-bbox").value.trim();
+    let bbox=null;
+    if (raw) {
+      bbox=raw.split(",").map(v=>Number(v.trim()));
+      if (bbox.length!==4 || bbox.some(v=>!Number.isFinite(v)))
+        throw Error("Face bbox must contain four normalized numbers: x,y,w,h");
+    }
+    const result=await faceRequest("POST","/cutout",{
+      asset_id:asset.id,
+      mode:byId("face-mode").value,
+      subject_type:byId("face-subject-type").value,
+      clean_source_confirmed:true,
+      acknowledge_source_license:byId("library-rights").checked,
+      face_bbox_norm:bbox,
+      seed:42041,
+    });
+    state.selectedFaceCutout={...result,approved:false,asset_id:asset.id};
+    byId("face-cutout-results").hidden=false;
+    byId("face-cutout-status").textContent =
+      "Exact reconstruction MAD = "+result.qa.exact_raw_rgba_mad+" · "+
+      result.piece_count+" real source pieces · face selection: "+
+      result.detection_method + " · Awaiting approval";
+    const previews=[
+      ["face-original-preview",result.images.source],
+      ["face-hole-preview",result.images.hole_plate],
+      ["face-piece-preview",result.images.pieces[0]],
+      ["face-mask-preview",result.images.masks[0]],
+    ];
+    for (const [id,url] of previews) byId(id).src=await protectedMedia(url);
+    byId("face-download-pack").href=await protectedMedia(
+      "/api/v1/assets/"+result.id+"/download"
+    );
+    byId("face-download-pack").download=result.id+".zip";
+    byId("face-approve-btn").disabled=false;
+    message("Real clean-source cutouts generated; inspect images and approve.", "ok");
+  });
+  handle(byId("face-approve-btn"), "Approving exact-fit pieces...", async () => {
+    if (!state.selectedFaceCutout) throw Error("Generate a cutout first.");
+    const result=await faceRequest("POST",
+      "/"+state.selectedFaceCutout.id+"/approve");
+    state.selectedFaceCutout.approved=true;
+    byId("face-approve-btn").disabled=true;
+    byId("face-cutout-status").textContent +=
+      " · APPROVED for deterministic face-puzzle rendering";
+    message("Face-cutout pack approved. Render an exact-match MP4.", "ok");
+  });
   handle(byId("library-render-btn"), "Rendering real-image MP4...", async () => {
     const art = state.selectedLibrary;
     if (!art || !art.approved || !art.production_eligible ||
@@ -231,6 +312,9 @@
       duration_sec: Number(byId("library-duration").value),
       exact_fit_count: Number(byId("library-fits").value),
       enable_sfx: byId("library-sfx").checked,
+      cutout_id: state.selectedFaceCutout && state.selectedFaceCutout.approved &&
+        state.selectedFaceCutout.asset_id === art.id
+          ? state.selectedFaceCutout.id : null,
       seed: (Date.now() >>> 0) % 2147483647
     });
     const url = await protectedMedia(result.video_url);
