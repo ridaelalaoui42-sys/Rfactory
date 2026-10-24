@@ -196,6 +196,7 @@ def render_curated_artwork(
             "face_mode": cut["mode"],
             "subject_type":cut["subject_type"],
             "face_bbox_norm":tuple(cut["face_bbox_norm"]) if cut.get("face_bbox_norm") else None,
+            "face_asset_seed":int(cut["seed"]),
         }
     try:
         result = render_approved_asset(
