@@ -136,6 +136,19 @@ def motion_pose(
         px = sign * a * 0.80 * tail * math.sin(3.0 * math.pi * u)
         py = sign * a * 0.80 * tail
         deg = handed * 28.0 * tail * math.sin(math.tau * u)
+    # New Rfactory 3 profiles also work through the backward-compatible
+    # hold-based evaluator. A legacy call must NOT return an unmoving identity
+    # pose just because its name was added to the central registry.
+    if profile not in {
+        "slide", "spin_snap", "orbit_lock", "pendulum",
+        "spiral", "elastic", "flip_reveal", "zigzag",
+    }:
+        if intensity == 0:
+            return MotionPose()
+        return continuous_motion_pose(
+            profile, p, travel_px=travel_px, seed=seed,
+            intensity=intensity, direction=direction,
+        )
     return MotionPose(
         dx=int(round(px)), dy=int(round(py)),
         angle_deg=round(deg, 4),
