@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "assetRoot": "public/rfactory-social",
+  "outputRoot": "storage/renders/social",
+  "output": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 24,
+    "videoCodec": "h264",
+    "audioCodec": "aac",
+    "textTarget": "family-friendly"
+  },
+  "presets": [
+    {
+      "name": "01_puppy_pop",
+      "duration": 8,
+      "background": "orange_comic_vertical.webp",
+      "subject": "animals__puppy_thumbsup",
+      "sidekick": "characters__boy_chef_surprised",
+      "reaction": "badges__wow_badge_yellow",
+      "puzzle": "circle",
+      "motion": "orbit",
+      "speed": 1,
+      "revealAt": 6.45,
+      "headline": "PUPPY POP!",
+      "instruction": "MATCH THE FACE!"
+    },
+    {
+      "name": "02_pizza_party",
+      "duration": 9,
+      "background": "purple_arcade_vertical.webp",
+      "subject": "food__whole_pizza",
+      "sidekick": "characters__girl_chef_cheering",
+      "reaction": "badges__heart_eyes_emoji",
+      "puzzle": "wedge",
+      "motion": "bounce",
+      "speed": 1.35,
+      "revealAt": 7.3,
+      "headline": "PIZZA PARTY!",
+      "instruction": "FIND THE SLICE!"
+    },
+    {
+      "name": "03_kitty_mixup",
+      "duration": 10,
+      "background": "blue_sky_party_vertical.webp",
+      "subject": "animals__happy_kitty",
+      "sidekick": "characters__girl_chef_surprised",
+      "reaction": "badges__laugh_emoji",
+      "puzzle": "eye_band",
+      "motion": "zigzag",
+      "speed": 1.65,
+      "revealAt": 8.3,
+      "headline": "KITTY MIX-UP!",
+      "instruction": "FIX THE KITTY!"
+    }
+  ],
+  "sourceMediaNotice": "Current sticker cutouts were extracted from low-resolution collage sheets; they are reference-only for full-HD canonical puzzle eligibility. Enlarged exports do not gain original detail."
+}
