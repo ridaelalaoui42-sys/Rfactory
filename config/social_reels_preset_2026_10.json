@@ -1,14 +1,9 @@
 {
   "version": 1,
-  "assetRoot": "public/rfactory-social",
-  "outputRoot": "storage/renders/social",
   "output": {
     "width": 1080,
     "height": 1920,
-    "fps": 24,
-    "videoCodec": "h264",
-    "audioCodec": "aac",
-    "textTarget": "family-friendly"
+    "fps": 24
   },
   "presets": [
     {
@@ -20,10 +15,14 @@
       "reaction": "badges__wow_badge_yellow",
       "puzzle": "circle",
       "motion": "orbit",
-      "speed": 1,
-      "revealAt": 6.45,
+      "speed": 1.0,
+      "revealAt": 7.32,
       "headline": "PUPPY POP!",
-      "instruction": "MATCH THE FACE!"
+      "instruction": "MATCH THE FACE!",
+      "fitCount": 5,
+      "holdFrames": 5,
+      "firstFit": 1.08,
+      "lastFit": 7.28
     },
     {
       "name": "02_pizza_party",
@@ -35,9 +34,13 @@
       "puzzle": "wedge",
       "motion": "bounce",
       "speed": 1.35,
-      "revealAt": 7.3,
+      "revealAt": 8.32,
       "headline": "PIZZA PARTY!",
-      "instruction": "FIND THE SLICE!"
+      "instruction": "FIND THE SLICE!",
+      "fitCount": 5,
+      "holdFrames": 5,
+      "firstFit": 1.08,
+      "lastFit": 8.28
     },
     {
       "name": "03_kitty_mixup",
@@ -49,10 +52,15 @@
       "puzzle": "eye_band",
       "motion": "zigzag",
       "speed": 1.65,
-      "revealAt": 8.3,
+      "revealAt": 9.32,
       "headline": "KITTY MIX-UP!",
-      "instruction": "FIX THE KITTY!"
+      "instruction": "FIX THE KITTY!",
+      "fitCount": 5,
+      "holdFrames": 5,
+      "firstFit": 1.08,
+      "lastFit": 9.28
     }
   ],
-  "sourceMediaNotice": "Current sticker cutouts were extracted from low-resolution collage sheets; they are reference-only for full-HD canonical puzzle eligibility. Enlarged exports do not gain original detail."
+  "assetPackGitHubPath": "assets/social/rfactory_social_assets_compact_v1.zip",
+  "motionVersion": "repeated-exact-fit-v2"
 }
