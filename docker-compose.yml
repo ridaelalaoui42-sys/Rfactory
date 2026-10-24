@@ -24,5 +24,21 @@ services:
       timeout: 5s
       retries: 3
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "scripts.daemon_worker", "--poll-seconds", "4"]
+    environment:
+      SQLITE_DB_PATH: /app/storage/factory.db
+      BROWSER_AUTOMATION_ENABLED: "false"
+      LIVE_PUBLISH_ENABLED: "false"
+      RFACTORY_AI_ENABLED: ${RFACTORY_AI_ENABLED:-false}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      RFACTORY_AI_DAILY_CALL_LIMIT: ${RFACTORY_AI_DAILY_CALL_LIMIT:-20}
+    volumes:
+      - rfactory_data:/app/storage
+
 volumes:
   rfactory_data:
