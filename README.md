@@ -114,3 +114,36 @@ Open `/studio` and paste the backend token. Begin with a creative brief, generat
 
 See [AI Studio documentation and Android plan](docs/AI_STUDIO_AND_ANDROID_PLAN.md). The API at `/api/v1/ai` intentionally separates Gemini credentials and FFmpeg workers from the frontend; `/openapi.json` can later support Capacitor or native Kotlin/Compose Android clients.
 
+
+## Rfactory 3.0 (development branch, not production)
+
+This branch is being implemented and validated in [PR #2](https://github.com/ridaelalaoui42-sys/Rfactory/pull/2).
+It upgrades the source-accurate engine, **not** Facebook publishing or native Android.
+
+**Motion:** sixteen deterministic continuous profiles; seeded, irregular, single-frame exact-fit crossings with no visible solve cue. Available in the Studio motion selector and through \`GET /api/v1/creative/capabilities\`. Preview the real pose path using \`POST /api/v1/creative/motion/preview\`.
+
+**Geometry:** eight pixel-derived mask geometries with positive/negative reconstruction and canonical artwork hash validation. Select a geometry when rendering a \`MISSING_PIECE_SLIDE\` puzzle. Multi-piece reconstruction validates 2–5 nonoverlapping fragments, but independent multi-piece rendering is still in development.
+
+**Live Gemini model discovery:** use \`GET /api/v1/ai/provider-models\` with the configured backend bearer token after enabling AI. This only lists models visible to the account and **does not prove free-tier quotas** or image/TTS authorization.
+
+**Single-host render daemon:** with the runtime installed and bootstrap completed, start:
+
+\`\`\`bash
+python -m scripts.daemon_worker --poll-seconds 4
+# Or process existing queued jobs once and exit:
+python -m scripts.daemon_worker --once
+\`\`\`
+
+A local exclusive lock prevents duplicate worker processes sharing the same storage directory. This is **not** a multi-host or distributed worker leasing solution.
+
+**Motion/geometry showcase:** six original bundled characters in distinct motion/cutout combinations:
+
+\`\`\`bash
+python -m scripts.render_rfactory3_showcase --duration 3 --count 3
+# Longer examples on a capable PC/VM:
+python -m scripts.render_rfactory3_showcase --duration 12 --count 5
+\`\`\`
+
+The GitHub workflow \`.github/workflows/rfactory3-showcase.yml\` uploads actual MP4s and their QA metadata. Artwork is bundled procedural artwork and audio is disabled in these technical demos: do not describe them as live Gemini outputs.
+
+See \`docs/RFACTORY_3_AUDIT.md\` for the complete implementation status and remaining work.
