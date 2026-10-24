@@ -35,6 +35,7 @@ from services.assets.segmentation import (
 from services.assets.sound_fx import synthesize_puzzle_audio_wav
 from services.engine.motion_profiles import motion_pose, continuous_motion_pose, transformed_sprite, MOTION_PROFILES, MotionPose
 from services.engine.snap_timeline import build_snap_timeline, build_crossing_timeline
+from services.engine.puzzle_geometry import GEOMETRIES, cut_exact_fragment
 
 
 @dataclass
@@ -68,6 +69,7 @@ class RenderConfig:
     continuous_motion: bool = True  # exact matches are single crossing frames; no freeze
     sound_mode: str = "match_only"  # sound at exact fit; no ticking or music
     snap_count: int = 0  # 0 = follow cycles; positive sets exact number of solves
+    puzzle_geometry: str = "legacy"  # optional new organic/jigsaw/ring/etc cutouts
 
 
 @dataclass
@@ -200,6 +202,10 @@ class PuzzleVideoRenderer:
         start_t = time.time()
         if config.motion_profile not in MOTION_PROFILES:
             raise ValueError("Unsupported motion profile: " + config.motion_profile)
+        if config.puzzle_geometry != "legacy" and config.puzzle_geometry not in GEOMETRIES:
+            raise ValueError("Unsupported puzzle geometry: " + config.puzzle_geometry)
+        if config.puzzle_geometry != "legacy" and config.template_id != "MISSING_PIECE_SLIDE":
+            raise ValueError("Custom geometry currently requires MISSING_PIECE_SLIDE template")
         if config.sound_mode not in {"match_only", "music_and_ticks"}:
             raise ValueError("Unsupported sound mode")
         if not 0.0 <= config.motion_intensity <= 2.0:
@@ -355,22 +361,42 @@ class PuzzleVideoRenderer:
         elif config.template_id == "MISSING_PIECE_SLIDE":
             animal_w, animal_h = 860, 860
             animal_rgba = cv2.resize(raw_animal_rgba, (animal_w, animal_h), interpolation=cv2.INTER_LANCZOS4)
-            mp_bundle = extract_missing_piece_bundle(
-                animal_rgba,
-                slice_x_ratio=config.slice_x_ratio,
-                placeholder_color=config.placeholder_color_rgba,
-            )
-            pixel_match_mad = mp_bundle.pixel_match_mad
-
             animal_x = (w - animal_w) // 2
             animal_y = (h - animal_h) // 2 - 40
 
-            alpha_composite_inplace(static_base_rgb, mp_bundle.base_with_placeholder_rgba, (animal_x, animal_y))
+            if config.puzzle_geometry == "legacy":
+                mp_bundle = extract_missing_piece_bundle(
+                    animal_rgba,
+                    slice_x_ratio=config.slice_x_ratio,
+                    placeholder_color=config.placeholder_color_rgba,
+                )
+                pixel_match_mad = mp_bundle.pixel_match_mad
+                base_rgba = mp_bundle.base_with_placeholder_rgba
+                piece_rgba = mp_bundle.extracted_piece_rgba
+                target_px = animal_x + mp_bundle.alignment_target_xy[0]
+                target_py = animal_y + mp_bundle.alignment_target_xy[1]
+            else:
+                # Canonical texture is sampled ONLY once, from the image that
+                # also defines the negative space. This is true jigsaw geometry,
+                # not an independently generated visual lookalike.
+                fragment_w = int(round(animal_w * 0.38))
+                fragment_h = int(round(animal_h * 0.29))
+                fragment_x = int(round(animal_w * 0.31))
+                fragment_y = int(round(animal_h * 0.33))
+                cut = cut_exact_fragment(
+                    animal_rgba,
+                    (fragment_x, fragment_y, fragment_w, fragment_h),
+                    geometry=config.puzzle_geometry,
+                    seed=config.seed,
+                )
+                pixel_match_mad = 0.0
+                base_rgba = cut.base_rgba
+                piece_rgba = cut.piece_rgba
+                target_px = animal_x + fragment_x
+                target_py = animal_y + fragment_y
 
-            piece_rgba = mp_bundle.extracted_piece_rgba
+            alpha_composite_inplace(static_base_rgb, base_rgba, (animal_x, animal_y))
             ph, _ = piece_rgba.shape[:2]
-            target_px = animal_x + mp_bundle.alignment_target_xy[0]
-            target_py = animal_y + mp_bundle.alignment_target_xy[1]
 
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
                 cycle_p = phase_for_frame(c_idx)
