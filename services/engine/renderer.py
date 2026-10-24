@@ -36,6 +36,9 @@ from services.assets.sound_fx import synthesize_puzzle_audio_wav
 from services.engine.motion_profiles import motion_pose, continuous_motion_pose, transformed_sprite, MOTION_PROFILES, MotionPose
 from services.engine.snap_timeline import build_snap_timeline, build_crossing_timeline
 from services.engine.puzzle_geometry import GEOMETRIES, cut_exact_fragment
+from services.assets.face_cutout_engine import FACE_MODES, face_cutout
+from services.assets.fit_validator import validate_face_bundle
+from services.assets.asset_packager import package_face_bundle
 
 
 @dataclass
@@ -70,6 +73,9 @@ class RenderConfig:
     sound_mode: str = "match_only"  # sound at exact fit; no ticking or music
     snap_count: int = 0  # 0 = follow cycles; positive sets exact number of solves
     puzzle_geometry: str = "legacy"  # optional new organic/jigsaw/ring/etc cutouts
+    face_mode: str = ""  # CANONICAL_FACE: meaningful animal/human feature fragments
+    subject_type: str = "animal"  # animal, human or portrait
+    face_bbox_norm: tuple[float,float,float,float] | None = None
 
 
 @dataclass
@@ -206,6 +212,11 @@ class PuzzleVideoRenderer:
             raise ValueError("Unsupported puzzle geometry: " + config.puzzle_geometry)
         if config.puzzle_geometry != "legacy" and config.template_id != "MISSING_PIECE_SLIDE":
             raise ValueError("Custom geometry currently requires MISSING_PIECE_SLIDE template")
+        if config.template_id == "CANONICAL_FACE":
+            if config.face_mode not in FACE_MODES:
+                raise ValueError("CANONICAL_FACE requires a supported face mode")
+            if config.subject_type not in {"animal","human","portrait"}:
+                raise ValueError("Unsupported face subject type")
         if config.sound_mode not in {"match_only", "music_and_ticks"}:
             raise ValueError("Unsupported sound mode")
         if not 0.0 <= config.motion_intensity <= 2.0:
@@ -357,6 +368,60 @@ class PuzzleVideoRenderer:
                 b_data = frame.tobytes()
                 frame_cache[animal_dx] = (b_data, frame)
                 return b_data, frame, is_aligned
+
+        elif config.template_id == "CANONICAL_FACE":
+            # One approved, clean source image drives the plate, positive pieces
+            # and the exact solved state. Never use an AI-drawn cutout collage.
+            face_w, face_h = 860, 860
+            source_rgba = cv2.resize(raw_animal_rgba, (face_w, face_h),
+                                     interpolation=cv2.INTER_LANCZOS4)
+            face_bundle = face_cutout(
+                source_rgba, config.face_mode, subject_type=config.subject_type,
+                seed=config.seed, face_bbox_norm=config.face_bbox_norm,
+            )
+            face_qa = validate_face_bundle(face_bundle)
+            pixel_match_mad = face_qa["exact_raw_rgba_mad"]
+            face_x, face_y = (w-face_w)//2, (h-face_h)//2-40
+            alpha_composite_inplace(
+                static_base_rgb, face_bundle.hole_plate_rgba,
+                (face_x,face_y),
+            )
+            package_face_bundle(
+                face_bundle, job_dir/"cutout_assets",
+                provenance="approved_source:" + str(config.asset_path or config.species),
+                approved=False,
+            )
+            # Multi-piece fragments have independent spatial paths. All
+            # fragments cross identity on precisely the same single frame.
+            # No status lights, pauses, solve overlay or victory animation.
+            def get_cycle_frame(c_idx: int) -> Tuple[bytes,np.ndarray,bool]:
+                phase = phase_for_frame(c_idx)
+                main_pose = _resolve_pose(
+                    config.motion_profile, phase,
+                    max(200,config.offset_distance_px*1.4),
+                    config.hold_ratio,config.seed,config.motion_intensity,
+                    "horizontal",
+                )
+                if c_idx in frame_cache:
+                    data, frame = frame_cache[c_idx]
+                    return data,frame,main_pose.locked
+                frame=static_base_rgb.copy()
+                for idx, piece in enumerate(face_bundle.pieces):
+                    x,y,_,_=piece.bounds_xywh
+                    pose = _resolve_pose(
+                        config.motion_profile,phase,
+                        max(200,config.offset_distance_px*(1.3+idx*.17)),
+                        config.hold_ratio,config.seed+idx*37,
+                        config.motion_intensity,
+                        "horizontal" if idx%2==0 else "vertical",
+                    )
+                    draw_motion_sprite(
+                        frame,piece.piece_rgba,
+                        (face_x+x,face_y+y),pose,
+                    )
+                data=frame.tobytes()
+                frame_cache[c_idx]=(data,frame)
+                return data,frame,main_pose.locked
 
         elif config.template_id == "MISSING_PIECE_SLIDE":
             animal_w, animal_h = 860, 860
