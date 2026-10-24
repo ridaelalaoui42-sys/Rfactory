@@ -62,6 +62,49 @@
               <button class="btn outline" id="library-approve-btn" disabled>✓ Approve HD asset</button>
               <button class="btn primary" id="library-stage-btn" disabled>Use selected artwork</button>
             </div>
+            <div class="face-builder" id="face-builder">
+              <h3>Face Cutout Builder</h3>
+              <p class="helper">The artwork must be completely intact. The engine extracts real face pixels—never asks AI to draw missing pieces.</p>
+              <div class="grid-two">
+                <div><label for="face-subject-type">Subject type</label>
+                <select id="face-subject-type">
+                  <option value="animal">Animal face</option>
+                  <option value="human">Human face</option>
+                  <option value="portrait">General portrait</option>
+                </select></div>
+                <div><label for="face-mode">Puzzle cutout</label>
+                <select id="face-mode">
+                  <option value="animal_face_core">Animal — full central face</option>
+                  <option value="animal_eye_band">Animal — moving eye band</option>
+                  <option value="animal_muzzle_patch">Animal — muzzle patch</option>
+                  <option value="animal_forehead_patch">Animal — forehead</option>
+                  <option value="human_three_slice_face">Human — three moving facial slices</option>
+                  <option value="human_triangle_face_puzzle">Human — three triangular fragments</option>
+                  <option value="human_eye_band">Human — eye band</option>
+                  <option value="human_nose_mouth_patch">Human — nose + mouth</option>
+                  <option value="human_feature_fragments">Human — three distinct features</option>
+                  <option value="portrait_center_mask">Portrait — central oval</option>
+                  <option value="portrait_ring_segment">Portrait — rotating ring</option>
+                  <option value="portrait_cheek_patch">Portrait — cheek</option>
+                </select></div>
+              </div>
+              <label for="face-manual-bbox">Optional reviewed face box — x, y, width, height (normalized 0–1)</label>
+              <input id="face-manual-bbox" type="text" placeholder="e.g. 0.24, 0.12, 0.52, 0.48">
+              <p class="helper">Human-face detection is automatic when possible. Animal positioning is an unverified estimate unless you enter a reviewed face box.</p>
+              <label class="check-row"><input id="face-clean-confirm" type="checkbox"> This artwork is a complete, clean source—not an AI-drawn fake puzzle or collage.</label>
+              <button id="face-generate-btn" class="btn outline full" disabled>✂ Generate exact cutout assets</button>
+              <div id="face-cutout-results" hidden>
+                <p id="face-cutout-status" class="helper"></p>
+                <div class="face-assets-grid">
+                  <div><strong>Original</strong><img id="face-original-preview" alt="Clean canonical source"></div>
+                  <div><strong>Hole plate</strong><img id="face-hole-preview" alt="Programmatically created hole plate"></div>
+                  <div><strong>Extracted piece</strong><img id="face-piece-preview" alt="First exact image fragment"></div>
+                  <div><strong>Mask</strong><img id="face-mask-preview" alt="Binary source mask"></div>
+                </div>
+                <button id="face-approve-btn" class="btn outline full">✓ Approve cutout geometry for rendering</button>
+                <a id="face-download-pack" class="btn outline full" href="#" download>↓ Export source + mask + pieces ZIP</a>
+              </div>
+            </div>
             <div class="library-direct-render">
               <h3>Produce Reel without Gemini</h3>
               <p class="helper">Render an approved original or explicitly selected HD fallback directly. No storyboard credits needed.</p>
