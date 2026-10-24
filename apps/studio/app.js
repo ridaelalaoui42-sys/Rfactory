@@ -214,6 +214,42 @@
     byId("art-status").textContent = "✓ Artwork approved for this Reel.";
     message("Artwork approved. The renderer can now use this exact generated subject.", "ok");
   });
+  handle(byId("motion-preview-btn"), "Checking motion...", async () => {
+    if (!state.token) throw Error("Enter your backend access token before previewing.");
+    const params = {
+      profile: byId("motion-profile").value || state.plan?.plan?.motion_profile || "orbit_lock",
+      fps: 30,
+      duration_sec: Number(byId("duration").value),
+      crossing_count: Number(byId("snap-count").value) || 5,
+      seed: 42041,
+      travel_px: 210,
+      intensity: Number(byId("motion-intensity").value),
+      samples: 320,
+    };
+    const result = await fetch("/api/v1/creative/motion/preview", {
+      method: "POST",
+      headers: {"Content-Type":"application/json",Authorization:"Bearer "+state.token},
+      body: JSON.stringify(params),
+      cache: "no-store"
+    });
+    const reply = await result.json();
+    if (!result.ok) throw Error(reply.detail || "Motion preview failed");
+    const maxDist = Math.max(1, ...reply.samples.map(p => Math.max(Math.abs(p.x),Math.abs(p.y))));
+    const factor = Math.min(0.78,110 / maxDist);
+    const points = reply.samples.map(p => [
+      +(180+p.x*factor).toFixed(2),
+      +(120+p.y*factor).toFixed(2)
+    ]);
+    byId("motion-svg-path").setAttribute("d", points.map((xy,i) =>
+      (i ? "L" : "M") + xy[0]+" "+xy[1]).join(" "));
+    byId("motion-inspector").hidden = false;
+    byId("motion-inspector-count").textContent = reply.crossing_count + " crossings";
+    byId("motion-preview-times").textContent =
+      "Exact-fit frames: " + reply.crossing_frames.join(", ") +
+      " · at " + reply.crossing_times_sec.map(t => t.toFixed(2)+"s").join(" · ") +
+      " · no pause or exported visual hints.";
+    message("Real deterministic motion path loaded; crossing markers are preview-only.", "ok");
+  });
   handle(byId("render-btn"), "Rendering Reel on server...", async () => {
     if (!state.plan || !state.image || state.image.status !== "APPROVED") {
       throw Error("Approve AI artwork before rendering.");
