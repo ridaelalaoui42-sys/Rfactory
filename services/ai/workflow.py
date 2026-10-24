@@ -312,6 +312,7 @@ class StudioWorkflow:
         motion_profile: str | None = None,
         motion_intensity: float = 1.0,
         snap_count: int = 0,
+        puzzle_geometry: str = "legacy",
     ) -> dict[str, Any]:
         # Rendering is deterministic and free of further AI calls. An explicit
         # image approval gate prevents automatic publishing of unreviewed art.
@@ -365,6 +366,7 @@ class StudioWorkflow:
             randomize_snap_timing=True,
             continuous_motion=True,
             snap_count=snap_count,
+            puzzle_geometry=puzzle_geometry,
         )
         artifact = renderer.render_video(configuration)
         qa = validate_rendered_video(
@@ -383,6 +385,7 @@ class StudioWorkflow:
             "voice_id": voice_id,
             "sfx_enabled": sfx_enabled,
             "motion_profile": selected_motion,
+            "puzzle_geometry": puzzle_geometry,
             "motion_intensity": motion_intensity,
             "snap_count": snap_count or int(creative.get("cycles", 5)),
             "timing_mode": "seeded_irregular_continuous",
