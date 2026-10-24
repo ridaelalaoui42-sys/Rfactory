@@ -10,6 +10,7 @@ import base64
 import io
 import json
 import os
+import hashlib
 from pathlib import Path
 from typing import Any, Literal
 
@@ -216,12 +217,49 @@ class GeminiCreativeStudio:
             if brief.transparent_subject
             else brief.prompt + f"\nArt direction: {brief.style}."
         )
-        response = self.client.interactions.create(
-            model=brief.model,
-            input=prompt,
-            response_format={"type": "image", "mime_type": "image/png", "aspect_ratio": "1:1"},
-        )
-        payload = getattr(getattr(response, "output_image", None), "data", None)
+        # Google's supported image-generation path returns actual IMAGE
+        # output parts through models.generate_content. Interactions remains
+        # as a backwards-compatible injected test-client fallback.
+        if hasattr(self.client, "models") and hasattr(self.client.models, "generate_content"):
+            try:
+                from google.genai import types
+                config = types.GenerateContentConfig(
+                    response_modalities=["IMAGE"],
+                    image_config=types.ImageConfig(aspect_ratio="1:1"),
+                )
+            except ImportError as exc:
+                raise ConfigurationError(
+                    "Google Gen AI SDK is required for live image generation"
+                ) from exc
+            response = self.client.models.generate_content(
+                model=brief.model,
+                contents=[prompt],
+                config=config,
+            )
+            parts = getattr(response, "parts", None)
+            if not parts:
+                candidates = getattr(response, "candidates", None) or []
+                parts = getattr(getattr(candidates[0], "content", None), "parts", []) if candidates else []
+            image_parts = [
+                getattr(part, "inline_data", None) for part in (parts or [])
+                if getattr(part, "inline_data", None) is not None
+            ]
+            payload = None
+            for image_part in image_parts:
+                mime = str(getattr(image_part, "mime_type", "") or "")
+                if mime.startswith("image/"):
+                    payload = getattr(image_part, "data", None)
+                    break
+        else:
+            # Used by existing network-free simulated-provider contract tests;
+            # this path never manufactures an image or reports a success without
+            # a byte payload returned by the injected provider.
+            response = self.client.interactions.create(
+                model=brief.model,
+                input=prompt,
+                response_format={"type": "image", "mime_type": "image/png", "aspect_ratio": "1:1"},
+            )
+            payload = getattr(getattr(response, "output_image", None), "data", None)
         if not payload:
             raise ProviderError("Gemini returned no image; no procedural fallback was substituted")
         blob = _decode_payload(payload, 15 * 1024 * 1024)
