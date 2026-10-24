@@ -170,6 +170,10 @@ class GeminiCreativeStudio:
             "high-retention vertical Reel with a real visual challenge, elegant art direction, "
             "and natural, brief narration. Avoid generic stock-vector style. "
             "Only original fictional/cartoon subjects unless permission for real people is verified. "
+            "The generated artwork is the COMPLETE CLEAN SOURCE, never a pre-cut puzzle. "
+            "Do not ask the image model for holes, missing patches, detached faces, "
+            "floating fragments, jigsaw outlines, collages, motion streaks or previews. "
+            "All cuts are performed later using the deterministic face-asset engine. "
             "For slicing puzzles use one single, isolated complete subject, centered, "
             "with natural anatomy, plain white surrounding canvas, without labels, words, "
             "watermarks, multiple subjects or clipping. Color/style consistency matters. "
@@ -213,7 +217,10 @@ class GeminiCreativeStudio:
             "clear realistic anatomy, sharp silhouette, subject occupies roughly 75% of the frame. "
             "One complete isolated subject on PURE WHITE (#FFFFFF), evenly lit, "
             "no text, no watermark, no border, no collage, no extra subjects, "
-            "no contact shadows. Keep generous whitespace on every edge."
+            "no contact shadows. Keep generous whitespace on every edge. "
+            "CRITICAL: COMPLETE intact eyes, mouth and face. NO puzzle cuts, "
+            "NO detached elements, NO missing regions, NO hole in the portrait, "
+            "NO floating duplicate face parts or animated fragments."
             if brief.transparent_subject
             else brief.prompt + f"\nArt direction: {brief.style}."
         )
@@ -278,7 +285,8 @@ class GeminiCreativeStudio:
             + ". Maintain the same single subject, coherent character identity, "
               "excellent anatomical consistency, complete limbs and edges, "
               "isolated pure-white/transparent background with 10% padding, "
-              "no captions, no watermarks. Style: " + brief.style
+              "no captions, no watermarks, and no AI-drawn puzzle cuts, "
+              "holes or detached face features. Style: " + brief.style
         )
         if hasattr(self.client, "interactions") and hasattr(self.client.interactions, "create"):
             response = self.client.interactions.create(
