@@ -54,10 +54,11 @@
     if (!response.ok) throw Error(body.detail || "Artwork import failed");
     return body;
   }
-  async function libraryRequest(method, path, payload) {
+  async function libraryRequest(method, path, payload, idempotencyKey) {
     if (!state.token) throw Error("Connect your Rfactory backend first.");
     const headers = {Authorization: "Bearer " + state.token};
     if (payload !== undefined) headers["Content-Type"] = "application/json";
+    if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
     const response = await fetch("/api/v1/library" + path, {
       method, headers, cache:"no-store",
       body: payload === undefined ? undefined : JSON.stringify(payload),
@@ -600,7 +601,7 @@
       name:byId("campaign-name").value.trim(),
       asset_ids:selected.map(item=>item.id),
       count,
-      base_seed:(Date.now()>>>0)%2147483647,
+      base_seed:Number(byId("campaign-seed").value),
       duration_sec:Number(byId("campaign-duration").value),
       exact_fit_count:Number(byId("campaign-fits").value),
       enable_sfx:byId("campaign-sfx").checked,
@@ -610,7 +611,19 @@
     const face=state.selectedFaceCutout;
     if(face && face.approved && selected.some(item=>item.id===face.asset_id))
       request.cutout_ids[face.asset_id]=face.id;
-    const result=await libraryRequest("POST","/campaigns",request);
+    // A retry after a lost response must return the ORIGINAL campaign,
+    // not create another 24 queued renders. Change the seed intentionally
+    // to request a genuinely new batch with different motion timings.
+    if(!Number.isInteger(request.base_seed) ||
+       request.base_seed<0 || request.base_seed>=2147483647)
+      throw Error("Campaign seed must be a positive integer below 2147483647.");
+    if(!crypto.subtle)throw Error("Open the Studio over HTTPS or localhost to enable safe request deduplication.");
+    const bytes=new TextEncoder().encode(JSON.stringify(request));
+    const digest=await crypto.subtle.digest("SHA-256",bytes);
+    const fingerprint=Array.from(new Uint8Array(digest)).map(
+      value=>value.toString(16).padStart(2,"0")).join("");
+    const result=await libraryRequest("POST","/campaigns",request,
+      "campaign-"+fingerprint);
     displayCampaign(result);
     await refreshRecentCampaigns();
     watchCampaign(result.id).catch(e=>message(e.message,"error"));
