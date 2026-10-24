@@ -83,6 +83,25 @@ https://ai.google.dev/gemini-api/docs/pricing
 
 No external generation is mocked as a real provider success.
 
+## Render an approved HD library source without Gemini image credits
+
+For local/VM production, choose a reviewed source ID from the library:
+
+\`\`\`bash
+python -m scripts.render_from_library \
+  --asset-id APPROVED_ASSET_ID \
+  --geometry organic --motion orbit_lock \
+  --duration 12 --crossings 5
+\`\`\`
+
+For a source explicitly labeled fallback, the operator must additionally
+supply \`--allow-fallback\`. Otherwise the render fails without substitution.
+
+Each generated MP4 has full frame QA, single-frame exact crossings, raw
+zero-MAD canonical alignment and a \`*.provenance.json\` record proving whether
+this was a generated source or an explicitly reused fallback. No Gemini call
+or Facebook publishing occurs during this offline render.
+
 ## Backend APIs
 
 All protected by the existing Rfactory API bearer middleware:
