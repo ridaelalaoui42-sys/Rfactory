@@ -28,6 +28,26 @@ jobs:
           python -m pip install numpy Pillow scipy
       - name: Render 3 new narrated Reels
         run: python -m scripts.render_new_voiceover_reels
+      - name: Build expressive offline preview voices (no neural provider claim)
+        run: |
+          python -m scripts.upgrade_social_voiceovers \
+            --provider offline-preview \
+            --input-dir storage/renders/social_voiceovers \
+            --output-dir storage/renders/social_expressive_preview
+      - name: Validate picture preservation and narration provenance
+        run: |
+          python - <<'PY'
+          import glob,json
+          files=glob.glob('storage/renders/social_expressive_preview/*_offline-preview_qa.json')
+          assert len(files)==3, files
+          for f in files:
+              r=json.load(open(f))
+              assert r['provider']=='offline-preview'
+              assert not r['neural_voice']
+              assert r['video_preserved']
+              assert len(r['exactFitFrames'])==5
+              assert r['original_video_stream_hash']==r['new_video_stream_hash']
+          PY
       - name: Verify videos and narrations
         run: |
           python - <<'PY'
@@ -52,5 +72,7 @@ jobs:
             storage/renders/social_voiceovers/*_poster.jpg
             storage/renders/social_voiceovers/*_qa.json
             storage/renders/social_voiceovers/*_narration_mix.wav
+            storage/renders/social_expressive_preview/*.mp4
+            storage/renders/social_expressive_preview/*_qa.json
           retention-days: 30
           if-no-files-found: error
