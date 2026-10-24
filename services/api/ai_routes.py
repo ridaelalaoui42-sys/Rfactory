@@ -15,6 +15,7 @@ from services.ai.studio import (
     CreativeBrief, ImageBrief, VoiceBrief, GeminiCreativeStudio,
     ConfigurationError, ProviderError, MODELS, VOICES, enabled,
 )
+from services.ai.provider_catalog import discover_gemini_models, ProviderCatalogError
 from services.ai.workflow import (
     StudioStore, StudioWorkflow, BudgetExceeded, ApprovalRequired, NotFoundError,
 )
@@ -91,6 +92,20 @@ def get_capabilities() -> dict:
         "auto_publish_enabled": False,
         "auth": "backend bearer token (replace with OAuth/JWT before mobile public launch)",
     }
+
+
+@router.get("/provider-models")
+def discover_provider_models(limit: int = 100):
+    """Query the real provider on demand; no billing/free entitlement claims."""
+    if not enabled():
+        raise HTTPException(status_code=503, detail="Enable Gemini on the server first")
+    try:
+        studio = GeminiCreativeStudio()
+        return discover_gemini_models(studio.client, limit=limit)
+    except (ConfigurationError, ProviderCatalogError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/plans", status_code=201)
