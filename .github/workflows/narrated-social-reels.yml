@@ -1,0 +1,56 @@
+name: Three narrated social puzzle Reels
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/narrated-social-reels.yml'
+      - 'scripts/render_new_voiceover_reels.py'
+      - 'assets/social/voiceover/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render-voiceovers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install audio and rendering tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg espeak
+          python -m pip install --upgrade pip
+          python -m pip install numpy Pillow scipy
+      - name: Render 3 new narrated Reels
+        run: python -m scripts.render_new_voiceover_reels
+      - name: Verify videos and narrations
+        run: |
+          python - <<'PY'
+          import glob, json, subprocess
+          paths=sorted(glob.glob('storage/renders/social_voiceovers/*.mp4'))
+          assert len(paths)==3,paths
+          for p in paths:
+              report=json.load(open(p.replace('.mp4','_qa.json')))
+              assert report['zeroFrameCount']==5,report
+              assert report['exactFitFrames']==report['observedZeroFrames']
+              assert report['voiceDuration']>6
+              fmt=report['format']
+              assert any(x['codec_name']=='h264' and x['width']==1080 and x['height']==1920 for x in fmt['streams'])
+              assert any(x['codec_name']=='aac' for x in fmt['streams'])
+              print(p,'voiceover',report['voiceDuration'],'seconds, 5 exact fits')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rfactory-3-voiceover-reels
+          path: |
+            storage/renders/social_voiceovers/*.mp4
+            storage/renders/social_voiceovers/*_poster.jpg
+            storage/renders/social_voiceovers/*_qa.json
+            storage/renders/social_voiceovers/*_narration_mix.wav
+          retention-days: 30
+          if-no-files-found: error
