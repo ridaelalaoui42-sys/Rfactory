@@ -440,8 +440,24 @@ class PuzzleVideoRenderer:
                 static_base_rgb, face_bundle.hole_plate_rgba,
                 (face_x,face_y),
             )
-            # Multi-piece fragments have independent spatial paths. All
-            # fragments cross identity on precisely the same single frame.
+            # Multi-piece fragments have genuinely different path families,
+            # while sharing the exact same single-frame crossing scheduler.
+            # Altering only the seed on a single profile looked repetitive.
+            face_motion_palette = (
+                config.motion_profile, "opposed_spin", "figure_eight",
+                "helix", "pendulum",
+            )
+            selected_piece_profiles = [
+                face_motion_palette[index % len(face_motion_palette)]
+                for index in range(len(face_bundle.pieces))
+            ]
+            # Capture the actual pixel-composited solved image as a reference
+            # BEFORE any independent sprite motion is applied.
+            solved_face_reference = static_base_rgb.copy()
+            alpha_composite_inplace(
+                solved_face_reference, face_bundle.source_rgba,
+                (face_x,face_y),
+            )
             # No status lights, pauses, solve overlay or victory animation.
             def get_cycle_frame(c_idx: int) -> Tuple[bytes,np.ndarray,bool]:
                 phase = phase_for_frame(c_idx)
@@ -458,7 +474,7 @@ class PuzzleVideoRenderer:
                 for idx, piece in enumerate(face_bundle.pieces):
                     x,y,_,_=piece.bounds_xywh
                     pose = _resolve_pose(
-                        config.motion_profile,phase,
+                        selected_piece_profiles[idx],phase,
                         max(200,config.offset_distance_px*(1.3+idx*.17)),
                         config.hold_ratio,config.seed+idx*37,
                         config.motion_intensity,
@@ -704,6 +720,19 @@ class PuzzleVideoRenderer:
             if aligned:
                 alignment_frames.append(f_idx)
 
+        if config.template_id == "CANONICAL_FACE" and alignment_frames:
+            # An identical source reconstruction is insufficient if video
+            # sprites were misplaced. Validate the real uncompressed *scene*
+            # produced by the renderer at every exact-fit moment.
+            for solved_idx in alignment_frames:
+                observed = get_cycle_frame(
+                    solved_idx if timeline is not None else solved_idx % cycle_frames
+                )[1]
+                if not np.array_equal(observed,solved_face_reference):
+                    raise RuntimeError(
+                        "The rendered solved face does not match its original scene pixels"
+                    )
+
         alignment_onsets_sec: List[float] = []
         prev_f = -999
         for f_idx in alignment_frames:
@@ -837,6 +866,8 @@ class PuzzleVideoRenderer:
             "motion_intensity": config.motion_intensity,
             "approved_face_pack_id": config.approved_face_pack_id or None,
             "reviewed_cutout_pixels_used_directly": bool(config.approved_face_pack_id),
+            "face_piece_motion_profiles": selected_piece_profiles if config.template_id == "CANONICAL_FACE" else None,
+            "solved_scene_raw_pixel_exact": True if config.template_id == "CANONICAL_FACE" else None,
             "snap_alignment_mad_uncompressed": pixel_match_mad,
         })
         frame_report_path = mp4_path.with_suffix(".frameqa.json")
