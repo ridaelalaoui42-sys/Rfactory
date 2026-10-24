@@ -56,6 +56,7 @@ class RenderRequest(BaseModel):
     motion_profile: str | None = Field(default=None, max_length=32, description="One of the supported motion profiles from /api/v1/creative/capabilities")
     motion_intensity: float = Field(default=1.0, ge=0.0, le=2.0)
     snap_count: int = Field(default=0, ge=0, le=12, description="0 uses storyboard cycles; 1-12 chooses number of irregular exact-fit events")
+    puzzle_geometry: str = Field(default="legacy", max_length=32)
 
 
 def _run(op):
@@ -136,7 +137,7 @@ def render_reel(req: RenderRequest, workflow: StudioWorkflow = Depends(get_workf
     return _run(lambda: workflow.render(req.plan_id, req.image_id, req.voice_id,
                                         req.duration_sec, req.sfx_enabled,
                                         req.motion_profile, req.motion_intensity,
-                                        req.snap_count))
+                                        req.snap_count, req.puzzle_geometry))
 
 
 @router.get("/library")
