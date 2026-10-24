@@ -200,6 +200,11 @@ def continuous_motion_pose(
         raise ValueError("Continuous motion intensity must be in (0,2]")
     if not 0.0 <= phase <= 1.0:
         raise ValueError("Motion phase must be in [0,1]")
+    # Closing the periodic curve numerically must reproduce the *identical*
+    # initial pose. sin(2*pi) leaves tiny residuals that become 1-pixel
+    # raster differences after round() at exactly phase=1.
+    if phase == 1.0:
+        phase = 0.0
     if direction not in {"horizontal", "vertical"}:
         raise ValueError("Unknown motion direction")
     if abs(phase - 0.5) < 1e-12:
