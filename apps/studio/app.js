@@ -517,10 +517,14 @@
     state.token = token;
     const caps = await request("GET", "/capabilities");
     if (!caps.ai_enabled || !caps.configured) {
-      message("Connected to Rfactory asset library. Gemini is unavailable; browsing, uploading and reviewing artwork remain accessible.", "ok");
-      output("To generate a storyboard, enable Gemini on the backend. Asset importing does not need image-generation credits.");
+      byId("connection-state").textContent = "Connected · offline generation";
+      document.querySelector(".led").classList.add("on");
+      byId("api-token").value = "";
+      byId("api-token").placeholder = "Connected to local Rfactory";
+      message("Connected. Original artwork, cutouts and render queue are available without Gemini.", "ok");
+      output("Rendering needs only approved HD artwork and the persistent local worker.");
       await loadArtworkLibrary();
-    await refreshRecentArtJobs();
+      await refreshRecentArtJobs();
       return;
     }
     byId("connection-state").textContent = "Connected to Gemini-ready backend";
@@ -529,6 +533,7 @@
     byId("api-token").value = "";
     byId("api-token").placeholder = "Token loaded for this session";
     await loadArtworkLibrary();
+    await refreshRecentArtJobs();
   });
   handle(byId("plan-btn"), "Directing with Gemini...", async () => {
     const brief = {
