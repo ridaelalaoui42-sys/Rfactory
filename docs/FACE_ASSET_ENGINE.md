@@ -90,3 +90,46 @@ doesn't provide a legal license for user images or a free Gemini image API.
 Real social posting, Android APK, and distributed SaaS job orchestration are
 separate milestones. A clean HD human photo or properly generated portrait
 should be used for final video production instead of the 512px proof source.
+
+## Four real-video demonstrations (delivered separately as media ZIP)
+
+The accompanying downloadable verification kit contains **four actual 1080×1920,
+30fps, 8-second H.264/AAC MP4 files**. Each has five irregular exact-fit
+crossings, zero raw RGBA reconstruction error, no deliberate solved-state hold,
+no identical consecutive piece poses, and full decoded-frame coverage
+(240 checked frames per video, 960 total).
+
+| Original clean source | Cutout type | Source quality |
+|---|---|---|
+| Snow leopard | Animal central face (organic) | 1024×1536 original AI-generated |
+| Snow leopard | Animal eyes band (curved) | Same independently generated HD original |
+| Human astronaut portrait | Three independently moving facial bands | 512×512 **reference only** |
+| Human astronaut portrait | Three moving triangular regions | Same 512×512 **reference only** |
+
+The human demo's source was an existing clean portrait reference, **not
+newly generated HD human artwork**. The same clean original source pixels
+were used to manufacture each cutout, not a prompt requesting fake puzzle
+pieces. A new production-resolution human source must be generated or
+provided and operator-approved before commercial HD use.
+
+Each demo includes original clean source, normalized source, hole plate,
+individual extracted RGBA fragments, binary masks, frame review, QA JSON,
+and a standalone reference renderer. The standalone reference renderer
+is not byte-identical to the GitHub application. Application-specific
+integration is independently covered by CI tests rendering real MP4s.
+
+### Standalone four-Reel campaign
+
+`python -m scripts.render_face_campaign --animal-core face_ID --animal-eye
+face_ID --human-slices face_ID --human-triangles face_ID`
+
+Each `face_ID` must correspond to an **approved**, same-source,
+previously reviewed asset pack. This command fails closed if any image
+approval, manifest mode, or source hash is invalid.
+
+### Visual face selection
+
+The Studio now provides an interactive source-image canvas. Drag over the
+animal's eyes and muzzle (or the central human face). The region is recorded
+as normalized source coordinates, reviewed in the mask/preview panel,
+then tied to the approved cutout's seed and canonical original image hash.
