@@ -217,10 +217,16 @@ class GeminiCreativeStudio:
             if brief.transparent_subject
             else brief.prompt + f"\nArt direction: {brief.style}."
         )
-        # Google's supported image-generation path returns actual IMAGE
-        # output parts through models.generate_content. Interactions remains
-        # as a backwards-compatible injected test-client fallback.
-        if hasattr(self.client, "models") and hasattr(self.client.models, "generate_content"):
+        # Preferred Google Interactions endpoint for current Nano Banana
+        # models. Legacy generate_content remains for compatible older
+        # providers and test clients without an interactions implementation.
+        if hasattr(self.client, "interactions") and hasattr(self.client.interactions, "create"):
+            response = self.client.interactions.create(
+                model=brief.model, input=prompt,
+                response_format={"type": "image", "aspect_ratio": "1:1", "image_size": "1K"},
+            )
+            payload = getattr(getattr(response, "output_image", None), "data", None)
+        elif hasattr(self.client, "models") and hasattr(self.client.models, "generate_content"):
             try:
                 from google.genai import types
                 config = types.GenerateContentConfig(
@@ -251,15 +257,7 @@ class GeminiCreativeStudio:
                     payload = getattr(image_part, "data", None)
                     break
         else:
-            # Used by existing network-free simulated-provider contract tests;
-            # this path never manufactures an image or reports a success without
-            # a byte payload returned by the injected provider.
-            response = self.client.interactions.create(
-                model=brief.model,
-                input=prompt,
-                response_format={"type": "image", "mime_type": "image/png", "aspect_ratio": "1:1"},
-            )
-            payload = getattr(getattr(response, "output_image", None), "data", None)
+            raise ConfigurationError("Gemini client does not support image generation")
         if not payload:
             raise ProviderError("Gemini returned no image; no procedural fallback was substituted")
         blob = _decode_payload(payload, 15 * 1024 * 1024)
@@ -282,7 +280,17 @@ class GeminiCreativeStudio:
               "isolated pure-white/transparent background with 10% padding, "
               "no captions, no watermarks. Style: " + brief.style
         )
-        if hasattr(self.client, "models") and hasattr(self.client.models, "generate_content"):
+        if hasattr(self.client, "interactions") and hasattr(self.client.interactions, "create"):
+            response = self.client.interactions.create(
+                model=brief.model,
+                input=[
+                    {"type": "text", "text": prompt},
+                    {"type": "image", "data": base64.b64encode(source).decode("ascii"), "mime_type": "image/png"},
+                ],
+                response_format={"type": "image", "aspect_ratio": "1:1", "image_size": "1K"},
+            )
+            encoded = getattr(getattr(response, "output_image", None), "data", None)
+        elif hasattr(self.client, "models") and hasattr(self.client.models, "generate_content"):
             try:
                 from google.genai import types
                 config = types.GenerateContentConfig(
@@ -310,15 +318,7 @@ class GeminiCreativeStudio:
                     encoded = getattr(inline, "data", None)
                     break
         else:
-            # Compatibility with injected test clients only.
-            response = self.client.interactions.create(
-                model=brief.model,
-                input=[
-                    {"type": "text", "text": prompt},
-                    {"type": "image", "data": base64.b64encode(source).decode("ascii"), "mime_type": "image/png"},
-                ],
-            )
-            encoded = getattr(getattr(response, "output_image", None), "data", None)
+            raise ConfigurationError("Gemini client does not support reference-image editing")
         if not encoded:
             raise ProviderError("Gemini returned no edited image")
         blob = _decode_payload(encoded, 15 * 1024 * 1024)
