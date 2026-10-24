@@ -15,11 +15,13 @@ import numpy as np
 
 MotionName = Literal[
     "slide", "spin_snap", "orbit_lock", "pendulum", "spiral", "elastic",
-    "flip_reveal", "zigzag",
+    "flip_reveal", "zigzag", "bezier_sweep", "catmull_wave",
+    "figure_eight", "vortex", "ricochet", "helix", "magnetic", "opposed_spin",
 ]
 MOTION_PROFILES = (
     "slide", "spin_snap", "orbit_lock", "pendulum", "spiral",
-    "elastic", "flip_reveal", "zigzag",
+    "elastic", "flip_reveal", "zigzag", "bezier_sweep", "catmull_wave",
+    "figure_eight", "vortex", "ricochet", "helix", "magnetic", "opposed_spin",
 )
 
 
@@ -196,8 +198,10 @@ def continuous_motion_pose(
     """
     if profile not in MOTION_PROFILES:
         raise ValueError("Unknown motion profile")
-    if not 0 < intensity <= 2.0:
-        raise ValueError("Continuous motion intensity must be in (0,2]")
+    if not math.isfinite(travel_px) or not 1 <= travel_px <= 4000:
+        raise ValueError("Travel distance must be finite and in [1,4000]")
+    if not math.isfinite(intensity) or not 0 < intensity <= 2.0:
+        raise ValueError("Continuous motion intensity must be finite in (0,2]")
     if not 0.0 <= phase <= 1.0:
         raise ValueError("Motion phase must be in [0,1]")
     # Closing the periodic curve numerically must reproduce the *identical*
@@ -264,6 +268,45 @@ def continuous_motion_pose(
         x = travel * (0.36 * e + 0.66 * s + 0.15 * e * math.sin(5*u))
         y = travel * (0.40 * e - 0.65 * s)
         angle = hand * (23 * e + 26 * s)
+    elif profile == "bezier_sweep":
+        # Cubic-Bézier-inspired S-curve, wrapped periodically.
+        x = travel * (0.47 * e + 0.75 * s - 0.13 * s**3)
+        y = travel * (0.23 * e - 0.37 * s + 0.23 * s**3)
+        angle = hand * (45 * e + 33 * s)
+    elif profile == "catmull_wave":
+        # Smooth, nonuniform spline-like traverse through four virtual knots.
+        x = travel * (0.46 * e + 0.54 * s + 0.17 * math.sin(2*u))
+        y = travel * (0.27 * e - 0.49 * s + 0.22 * math.sin(3*u))
+        angle = hand * (35 * e - 24 * s)
+    elif profile == "figure_eight":
+        x = travel * (0.44 * e + 0.60 * s)
+        y = travel * (0.22 * e + 0.58 * math.sin(2*u))
+        angle = hand * (55 * e - 40 * s)
+    elif profile == "vortex":
+        radial = 0.35 + 0.45 * e
+        x = travel * (0.25 * e + radial * s)
+        y = travel * (0.63 * e - radial * math.sin(2*u))
+        angle = hand * (310 * e + 230 * s) * intensity
+    elif profile == "ricochet":
+        # Smooth ricochet-like harmonic deflections (no physical collision).
+        x = travel * (0.44 * e + 0.56 * s + 0.11 * math.sin(5*u))
+        y = travel * (0.34 * e - 0.41 * s + 0.15 * math.sin(3*u))
+        angle = hand * (31 * e + 23 * math.sin(3*u))
+    elif profile == "helix":
+        x = travel * (0.25 * e + 0.62 * s)
+        y = travel * (0.54 * e + 0.24 * math.sin(2*u))
+        angle = hand * (460 * e + 270 * s) * intensity
+        sx = 1.0 - 0.35 * e
+        sy = 1.0 - 0.12 * e
+    elif profile == "magnetic":
+        # Fields guide the piece through the target without stopping.
+        x = travel * (0.30 * e + 0.77 * s + 0.12 * math.sin(4*u))
+        y = travel * (0.48 * e - 0.26 * s)
+        angle = hand * (17 * e + 35 * s)
+    elif profile == "opposed_spin":
+        x = travel * (0.29 * e - 0.48 * s)
+        y = travel * (0.48 * e + 0.38 * s)
+        angle = hand * (-340 * e + 215 * s) * intensity
     return MotionPose(
         dx=int(round(x)), dy=int(round(y)),
         angle_deg=round(angle, 4),
