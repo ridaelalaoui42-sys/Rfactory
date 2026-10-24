@@ -77,6 +77,7 @@ class RenderConfig:
     face_mode: str = ""  # CANONICAL_FACE: meaningful animal/human feature fragments
     subject_type: str = "animal"  # animal, human or portrait
     face_bbox_norm: tuple[float,float,float,float] | None = None
+    face_asset_seed: int | None = None  # approved source mask seed; motion seed remains independent
 
 
 @dataclass
@@ -406,7 +407,8 @@ class PuzzleVideoRenderer:
             )
             face_bundle = face_cutout(
                 source_rgba, config.face_mode, subject_type=config.subject_type,
-                seed=config.seed, face_bbox_norm=normalized_face_box,
+                seed=config.face_asset_seed if config.face_asset_seed is not None else config.seed,
+                face_bbox_norm=normalized_face_box,
             )
             face_qa = validate_face_bundle(face_bundle)
             pixel_match_mad = face_qa["exact_raw_rgba_mad"]
