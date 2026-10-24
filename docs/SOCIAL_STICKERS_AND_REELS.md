@@ -16,7 +16,7 @@ The compact 3.1 MB ZIP is stored in the Git repository under `assets/social/`, s
     python scripts/install_social_assets.py assets/social/rfactory_social_assets_compact_v1.zip --dest public/rfactory-social
     python -m scripts.social_reels_from_config --settings config/social_reels_preset_2026_10.json --assets public/rfactory-social --out storage/renders/social
 
-You need Python 3.11+, Pillow, NumPy, FFmpeg and FFprobe on PATH. The renderer produces 1080×1920, 24 FPS, H.264/AAC MP4s, posters and JSON QA results. Its new `scripts/social_motion.py` fits the source-pixel puzzle piece precisely five times per reel, with a 5-frame dwell at each hit, departures between hits, and an exact final hold.
+You need Python 3.11+, Pillow, NumPy, FFmpeg and FFprobe on PATH. The renderer produces 1080×1920, 24 FPS, H.264/AAC MP4s, posters and JSON QA results. Its new `scripts/social_motion.py` fits the source-pixel puzzle piece precisely five times per reel, with a single-frame zero-offset crossing at each hit, departure between hits, and no final solved hold.
 
 ## Presets
 | Slug | Subject | Puzzle | Motion | Length | Reveal |
@@ -38,4 +38,56 @@ The *full unoptimized export* ZIP is about 70 MB and remains outside Git history
 Edit `config/social_reels_preset_2026_10.json` (headlines, duration, speed, puzzle shape, motion, **fitCount, firstFit, lastFit, holdFrames**, or background), then rerun `python -m scripts.social_reels_from_config` with `--assets` and `--out`. The JSON adapter validates supported shape/motion and reveal bounds before rendering.
 
 ## Exact repeated-match QA
-Run `python -m unittest tests.test_social_motion -v` to validate 5 scheduled precise (0,0)-pixel matches per reel, 5-frame visible holds, and sufficient departures between fits. The per-render `*_qa.json` includes `repeated_alignment.fit_frames` and `fit_times_seconds` recorded for each video. Media remains reference-only until separate full-HD original subject generation is available.
+Run `python -m unittest tests.test_social_motion -v` to validate 5 scheduled precise (0,0)-pixel matches per reel, zero hold frames, and sufficient departures between fits. The per-render `*_qa.json` includes `repeated_alignment.fit_frames` and `fit_times_seconds` recorded for each video. Media remains reference-only until separate full-HD original subject generation is available.
+
+## Rfactory 3.4 — Continuous Puzzle Rule (2026-10-24)
+
+**The earlier hold-based motion presets in this document are superseded.**
+The previous optional social renderer was not consistent with the principal
+Rfactory face/video engine: it froze a completed fragment for five frames,
+showed a green 'MATCH' banner, and held the solution at the end. That is now
+fixed in \`scripts/social_motion.py\` and \`scripts/render_social_reels.py\`.
+
+New social exports require:
+
+- Exactly **one** matched frame per scheduled event, not a 5-frame dwell.
+- A seed-controlled, **irregular** schedule of five fits with minimum
+  separation and nonzero piece movement immediately on either side.
+- A nonzero departure after the final matched frame; no end-of-video hold.
+- No solved-state animation, ring, badge, victory text, or MATCH counter.
+- Soft optional audio only at exact crossing frames. No half-second ticking.
+- Positive cutout pixels originate from the same source as the negative hole.
+  The preview renderer does not paint translucent 'ghost' pixels underneath
+  the missing piece, preserving composited source fidelity.
+- The 3.4 settings file has \`holdFrames: 0\` and a stable random \`seed\`.
+  Old social presets with \`holdFrames: 5\` are **rejected**, not silently run
+  with solved-state freezing.
+- Video QA reports \`exact_fit_frames_per_event: 1\`,
+  \`no_visual_match_indicators: true\`, and \`final_frame_solved: false\`.
+
+Verified independent video showcase workflow:
+\`.github/workflows/nohold-social-showcase.yml\` installs the compact
+**included** artwork pack, renders all three actual 1080×1920 MP4s, checks
+H.264 metadata, frame counts, irregular crossing timing and zero hold, and
+uploads the playable Reels + QA manifest for review.
+
+Run locally:
+
+\`\`\`bash
+python scripts/install_social_assets.py assets/social/rfactory_social_assets_compact_v1.zip --dest public/rfactory-social
+python -m scripts.social_reels_from_config \\
+  --settings config/social_reels_preset_2026_10.json \\
+  --assets public/rfactory-social \\
+  --out storage/renders/social-nohold
+\`\`\`
+
+### Artwork eligibility warning
+
+These are social-style **preview Reels**. The compact sticker assets were
+extracted from multi-subject artwork and remain reference-only where native
+resolution is insufficient. A visually acceptable preview render does **not**
+turn those crops into separately generated 768px+ canonical source art, or
+authorize use as production HD source for the main face puzzle editor.
+
+The stricter Face Asset Engine in \`services/assets/\` and the approved-source
+library remain in force.
