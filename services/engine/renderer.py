@@ -37,7 +37,6 @@ from services.engine.motion_profiles import motion_pose, continuous_motion_pose,
 from services.engine.snap_timeline import build_snap_timeline, build_crossing_timeline
 from services.engine.puzzle_geometry import GEOMETRIES, cut_exact_fragment
 from services.assets.face_cutout_engine import FACE_MODES, face_cutout
-from services.assets.face_cutout_engine import FACE_MODES, face_cutout
 from services.assets.fit_validator import validate_face_bundle
 from services.assets.asset_packager import package_face_bundle
 
@@ -74,9 +73,6 @@ class RenderConfig:
     sound_mode: str = "match_only"  # sound at exact fit; no ticking or music
     snap_count: int = 0  # 0 = follow cycles; positive sets exact number of solves
     puzzle_geometry: str = "legacy"  # optional new organic/jigsaw/ring/etc cutouts
-    face_mode: str = ""  # required when template_id=FACE_CANONICAL
-    face_subject_type: str = "animal"
-    face_bbox_norm: tuple[float,float,float,float] | None = None
 
     face_mode: str = ""  # CANONICAL_FACE: meaningful animal/human feature fragments
     subject_type: str = "animal"  # animal, human or portrait
@@ -215,13 +211,6 @@ class PuzzleVideoRenderer:
             raise ValueError("Unsupported motion profile: " + config.motion_profile)
         if config.puzzle_geometry != "legacy" and config.puzzle_geometry not in GEOMETRIES:
             raise ValueError("Unsupported puzzle geometry: " + config.puzzle_geometry)
-        if config.template_id == "FACE_CANONICAL":
-            if config.face_mode not in FACE_MODES:
-                raise ValueError("Select a real face-cutout mode")
-            if config.face_subject_type not in {"animal", "human", "portrait"}:
-                raise ValueError("Subject type must identify the actual face")
-            if config.face_bbox_norm is None:
-                raise ValueError("A reviewed face rectangle is required for face-puzzle production")
         if config.puzzle_geometry != "legacy" and config.template_id != "MISSING_PIECE_SLIDE":
             raise ValueError("Custom geometry currently requires MISSING_PIECE_SLIDE template")
         if config.template_id == "CANONICAL_FACE":
@@ -431,56 +420,6 @@ class PuzzleVideoRenderer:
                         frame,piece.piece_rgba,
                         (face_x+x,face_y+y),pose,
                     )
-                data=frame.tobytes()
-                frame_cache[c_idx]=(data,frame)
-                return data,frame,main_pose.locked
-
-        elif config.template_id == "FACE_CANONICAL":
-            # All fragments and the negative plate are extracted from ONE
-            # accepted, complete image; generative models do not draw holes.
-            portrait_w, portrait_h = 860, 860
-            subject_rgba = cv2.resize(
-                raw_animal_rgba, (portrait_w, portrait_h), interpolation=cv2.INTER_LANCZOS4
-            )
-            bundle = face_cutout(
-                subject_rgba, config.face_mode,
-                subject_type=config.face_subject_type, seed=config.seed,
-                face_bbox_norm=config.face_bbox_norm,
-            )
-            from services.assets.fit_validator import validate_face_bundle
-            face_qa = validate_face_bundle(bundle)
-            pixel_match_mad = face_qa["exact_raw_rgba_mad"]
-            subject_x = (w - portrait_w)//2
-            subject_y = (h - portrait_h)//2 - 40
-            alpha_composite_inplace(
-                static_base_rgb, bundle.hole_plate_rgba, (subject_x,subject_y)
-            )
-            parts = [
-                (p.piece_rgba, subject_x+p.bounds_xywh[0],
-                 subject_y+p.bounds_xywh[1])
-                for p in bundle.pieces
-            ]
-
-            def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
-                phase = phase_for_frame(c_idx)
-                main_pose = _resolve_pose(
-                    config.motion_profile, phase, max(220,config.offset_distance_px*1.8),
-                    config.hold_ratio, config.seed, config.motion_intensity,"horizontal",
-                )
-                if c_idx in frame_cache:
-                    data, cached = frame_cache[c_idx]
-                    return data,cached,main_pose.locked
-                frame = static_base_rgb.copy()
-                for idx,(image,tx,ty) in enumerate(parts):
-                    # Independent piece movement, simultaneously exact only at
-                    # the true crossing frame, no visual solve indication.
-                    pose = _resolve_pose(
-                        config.motion_profile, phase,
-                        max(185,config.offset_distance_px*(1.65+idx*.2)),
-                        config.hold_ratio, config.seed+idx*7,
-                        config.motion_intensity,"horizontal",
-                    )
-                    draw_motion_sprite(frame,image,(tx,ty),pose)
                 data=frame.tobytes()
                 frame_cache[c_idx]=(data,frame)
                 return data,frame,main_pose.locked
