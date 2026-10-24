@@ -15,7 +15,7 @@
       <div class="brand"><span class="brand-icon">R<span class="brand-dot">.</span></span><span><strong>Rfactory</strong><small>AI CREATIVE STUDIO</small></span></div>
       <div class="sidebar-label">WORKSPACE</div>
       <div class="nav-active">✦ &nbsp; Creative Studio</div>
-      <div class="nav-passive">▦ &nbsp; Content Library <span>Next</span></div>
+      <div class="nav-passive">▦ &nbsp; Content Library <span>Active</span></div>
       <div class="nav-passive">◷ &nbsp; Publishing Queue <span>Next</span></div>
       <div class="sidebar-foot"><span class="led"></span><span id="connection-state">Not connected</span><p>Original artwork · Controlled AI generation<br>Human approval before publishing</p></div>
     </aside>
@@ -33,9 +33,36 @@
               <div><label for="language">Language</label><select id="language"><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option><option value="ar">العربية</option></select></div>
               <div><label for="duration">Reel duration</label><select id="duration"><option value="15">15 seconds</option><option value="8">8 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option></select></div>
             </div>
-            <label for="twist">Creative twist</label><input id="twist" value="Clean perfect alignment with a delightful reveal" maxlength="250">
+            <label for="twist">Creative twist</label><input id="twist" value="Continuous perfect crossings without pauses or visual hints" maxlength="250">
             <button class="btn primary full" id="plan-btn">✦ Generate Gemini storyboard</button>
             <span class="helper">Gemini creates a distinctive art brief, caption, motion concept and voiceover script.</span>
+          </div>
+          <div class="panel" id="asset-library-panel">
+            <div class="panel-top"><span class="step">ART</span><div><h2>Original artwork library</h2><p>Real AI imagery, explicit fallback choices, no placeholder shapes.</p></div></div>
+            <p class="helper">Upload your Rfactory AI Art Pack ZIP. HD images require review before video production. Small catalog thumbnails are reference-only.</p>
+            <label for="library-pack-file">Generated asset library (ZIP)</label>
+            <input id="library-pack-file" type="file" accept=".zip,application/zip">
+            <button class="btn outline full" id="library-import-btn">↑ Install artwork pack</button>
+            <div class="grid-two">
+              <div><label for="library-category">Filter category</label>
+                <select id="library-category">
+                  <option value="animals">Animals</option><option value="characters">Characters</option>
+                  <option value="vehicles">Vehicles</option><option value="fantasy">Fantasy</option>
+                  <option value="objects">Objects</option><option value="backgrounds">Backgrounds</option>
+                </select></div>
+              <div><label for="library-quality">Quality</label>
+                <select id="library-quality"><option value="all">All artwork + references</option><option value="production">HD production candidates only</option></select></div>
+            </div>
+            <button class="btn outline full" id="library-refresh-btn">▦ Refresh artwork library</button>
+            <div id="library-status" role="status" class="helper">Connect to load library assets.</div>
+            <div id="library-grid" class="asset-grid" aria-label="Available AI and fallback artwork"></div>
+            <div id="library-selection" class="helper">Select a library image to inspect provenance.</div>
+            <label class="check-row" for="library-rights"><input id="library-rights" type="checkbox"> I confirm I may use the selected artwork.</label>
+            <div class="btn-row">
+              <button class="btn outline" id="library-approve-btn" disabled>✓ Approve HD asset</button>
+              <button class="btn primary" id="library-stage-btn" disabled>Use selected artwork</button>
+            </div>
+            <p class="helper">Fallback never means the Gemini image API succeeded. Nothing is silently substituted or published.</p>
           </div>
           <div class="panel" id="storyboard-panel" hidden>
             <div class="panel-top"><span class="step">02</span><div><h2>Director's cut</h2><p>Review and refine prompts before spending image/voice credits.</p></div></div>
@@ -54,7 +81,7 @@
             <div class="btn-row"><button class="btn primary" id="image-btn">✦ Generate original art</button><button class="btn outline" id="voice-btn">◉ Generate voiceover</button></div>
           </div>
           <div class="panel" id="production-panel" hidden>
-            <div class="panel-top"><span class="step">03</span><div><h2>Production & review</h2><p>AI-generated work requires inspection before video rendering.</p></div></div>
+            <div class="panel-top"><span class="step">03</span><div><h2>Production & review</h2><p>All source artwork requires inspection before video rendering.</p></div></div>
             <div id="art-status" class="muted">No artwork yet.</div><label for="edit-prompt">Refine existing artwork with Gemini</label><input id="edit-prompt" maxlength="1800" value="Improve the fine texture, shading and silhouette while preserving the character identity"><button class="btn outline full" id="refine-btn" disabled>✧ Edit this image with Nano Banana</button>
             <button class="btn outline full" id="approve-btn" disabled>✓ Approve image for production</button>
             <label for="motion-profile">Motion choreography</label>
@@ -111,7 +138,7 @@
               <option value="7">7 surprise matches</option>
               <option value="8">8 surprise matches</option>
             </select>
-            <p class="helper">Each match lasts briefly and occurs at a seeded, irregular moment—not only at the end. The same source pixels lock perfectly into place every time.</p>
+            <p class="helper">Each match occurs at a single seeded, irregular frame—not only at the end. Motion never pauses. The same source pixels lock perfectly into place every time.</p>
             <label for="motion-intensity">Movement intensity <output id="motion-value">1.0×</output></label>
             <input type="range" id="motion-intensity" min="0.3" max="2.0" step="0.1" value="1.0">
             <label class="check-row" for="sfx-enabled"><input type="checkbox" id="sfx-enabled" checked> Mix puzzle sound effects with narration</label><button class="btn primary full" id="render-btn" disabled>▶ Render final 9:16 Reel</button>
