@@ -72,6 +72,9 @@
     byId("library-stage-btn").disabled =
       !asset || !asset.production_eligible || !asset.approved ||
       !state.plan || !byId("library-rights").checked;
+    byId("library-render-btn").disabled =
+      !asset || !asset.production_eligible || !asset.approved ||
+      !byId("library-rights").checked;
   }
   async function loadArtworkLibrary() {
     const category = byId("library-category").value;
@@ -213,6 +216,34 @@
     state.selectedLibrary = record;
     message("Approved " + record.subject + " as a vetted original artwork source.", "ok");
     await loadArtworkLibrary();
+  });
+  handle(byId("library-render-btn"), "Rendering real-image MP4...", async () => {
+    const art = state.selectedLibrary;
+    if (!art || !art.approved || !art.production_eligible ||
+        !byId("library-rights").checked) {
+      throw Error("Approve real HD artwork and confirm your rights before rendering.");
+    }
+    const result = await libraryRequest("POST", "/renders", {
+      asset_id: art.id,
+      allow_fallback: Boolean(art.is_fallback),
+      geometry: byId("library-cutout").value,
+      motion_profile: byId("library-motion").value,
+      duration_sec: Number(byId("library-duration").value),
+      exact_fit_count: Number(byId("library-fits").value),
+      enable_sfx: byId("library-sfx").checked,
+      seed: (Date.now() >>> 0) % 2147483647
+    });
+    const url = await protectedMedia(result.video_url);
+    byId("library-video-player").src = url;
+    byId("library-video-download").href = url;
+    byId("library-video-result").hidden = false;
+    byId("library-video-qa").textContent =
+      "Verified " + result.decoded_frames_checked + " frames · raw alignment MAD " +
+      result.raw_alignment_mad + " · exact fits: " +
+      result.exact_fit_times_sec.map(t => Number(t).toFixed(2) + "s").join(", ") +
+      " · " + (result.fallback_used ? "explicit fallback source" : "original approved source") +
+      " · NOT PUBLISHED";
+    message("Finished MP4 ready: " + result.id + ". Video passed alignment and frame QA.", "ok");
   });
   handle(byId("library-stage-btn"), "Preparing artwork for Reel...", async () => {
     if (!state.selectedLibrary || !state.plan || !byId("library-rights").checked) {
