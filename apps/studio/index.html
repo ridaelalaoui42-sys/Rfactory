@@ -68,7 +68,26 @@
               <option value="flip_reveal">Flip perspective reveal</option>
               <option value="zigzag">Zigzag ricochet</option>
               <option value="slide">Classic slide</option>
+              <option value="bezier_sweep">Bézier S sweep</option>
+              <option value="catmull_wave">Smooth spline wave</option>
+              <option value="figure_eight">Figure-eight trajectory</option>
+              <option value="vortex">Vortex spiral</option>
+              <option value="ricochet">Multi-harmonic ricochet</option>
+              <option value="helix">3D-style helical motion</option>
+              <option value="magnetic">Magnetic fly-through</option>
+              <option value="opposed_spin">Reverse spin</option>
             </select>
+            <button class="btn outline full" id="motion-preview-btn">◇ Preview motion path &amp; exact-fit events</button>
+            <div id="motion-inspector" class="motion-inspector" hidden>
+              <div class="motion-inspector-caption">Live deterministic trajectory preview <span id="motion-inspector-count"></span></div>
+              <svg id="motion-canvas" viewBox="0 0 360 240" role="img" aria-label="Actual movement trajectory and exact target center">
+                <defs><linearGradient id="motion-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7e87ff"/><stop offset="100%" stop-color="#70e5de"/></linearGradient></defs>
+                <path id="motion-svg-path" fill="none" stroke="url(#motion-gradient)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                <circle cx="180" cy="120" r="8" fill="none" stroke="#f0d27b" stroke-width="2" />
+                <path d="M180 100 V110 M180 130 V140 M160 120 H170 M190 120 H200" stroke="#f0d27b" opacity=".7" stroke-width="2" />
+              </svg>
+              <div id="motion-preview-times" class="helper"></div>
+            </div>
             <label for="snap-count">Exact-fit moments throughout the video</label>
             <select id="snap-count">
               <option value="0">✦ Gemini chooses the count · irregular timing</option>
