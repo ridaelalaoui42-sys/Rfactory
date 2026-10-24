@@ -27,12 +27,14 @@ from services.publisher.adapters import (
 )
 from services.worker.batch_runner import BatchProductionWorker
 from services.api.ai_routes import router as ai_router
+from services.api.creative_routes import router as creative_router
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 STORAGE_ROOT = REPO_ROOT / "storage"
 
 app = FastAPI(title="Animal Puzzle Reels Factory API", version="2.0.0")
 app.include_router(ai_router)
+app.include_router(creative_router)
 
 # Framework-neutral, mobile-first studio. Future Android clients share this
 # API while the UI can be packaged with Capacitor if desired.
