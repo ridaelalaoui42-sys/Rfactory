@@ -108,6 +108,10 @@ class FaceCutoutAPITests(unittest.TestCase):
             self.assertEqual(result.status_code,201,result.text)
             self.assertEqual(render.call_args.kwargs["face_mode"],"human_three_slice_face")
             self.assertEqual(render.call_args.kwargs["subject_type"],"human")
+            self.assertEqual(render.call_args.kwargs["face_asset_seed"], 31)
+            self.assertEqual(render.call_args.kwargs["face_bbox_norm"], (.19,.17,.64,.64))
+            self.assertNotEqual(render.call_args.kwargs["seed"], render.call_args.kwargs["face_asset_seed"])
+
             self.assertEqual(result.json()["face_cutout_id"],pack_id)
             data["asset_id"]="0"*32
             self.assertEqual(self.client.post("/api/v1/library/renders",headers=self.headers,json=data).status_code,409)
