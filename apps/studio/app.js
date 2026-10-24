@@ -382,36 +382,116 @@
       " · APPROVED for deterministic face-puzzle rendering";
     message("Face-cutout pack approved. Render an exact-match MP4.", "ok");
   });
-  handle(byId("library-render-btn"), "Rendering real-image MP4...", async () => {
-    const art = state.selectedLibrary;
+  let monitoredArtJob = null;
+  async function showFinishedArtJob(result) {
+    if (!result || !result.video_url) throw Error("Ready job has no video output.");
+    const url=await protectedMedia(result.video_url);
+    byId("library-video-player").src=url;
+    byId("library-video-download").href=url;
+    byId("library-video-result").hidden=false;
+    byId("library-video-qa").textContent=
+      "Verified "+result.decoded_frames_checked+
+      " frames · raw alignment MAD "+result.raw_alignment_mad+
+      " · exact fit moments: "+(result.exact_fit_times_sec || []).map(
+        x=>Number(x).toFixed(2)+"s").join(", ")+
+      " · "+(result.fallback_used ? "explicit fallback" : "approved original")+
+      " · NOT PUBLISHED";
+    message("Render finished and passed frame QA. Video ready to watch.", "ok");
+  }
+  async function monitorArtJob(id) {
+    if (monitoredArtJob === id) return;
+    monitoredArtJob=id;
+    async function poll() {
+      if (monitoredArtJob !== id) return;
+      try {
+        const job=await libraryRequest("GET","/render-jobs/"+encodeURIComponent(id));
+        const pct=Number(job.progress_pct || 0);
+        byId("library-job-progress").value=pct;
+        byId("library-job-status").textContent=
+          "Reel "+id+" · "+job.status+" · "+pct+"%"+
+          (job.status==="QUEUED" ? " · waiting for local worker" : "");
+        byId("library-job-cancel").disabled=job.status!=="QUEUED";
+        if (job.status==="READY") {
+          monitoredArtJob=null;
+          await showFinishedArtJob(job.result);
+          await refreshRecentArtJobs();
+          return;
+        }
+        if (job.status==="FAILED"||job.status==="CANCELLED") {
+          monitoredArtJob=null;
+          message(job.status==="FAILED" ? job.error || "Render failed" : "Render cancelled",
+                  job.status==="FAILED" ? "error" : "ok");
+          await refreshRecentArtJobs();
+          return;
+        }
+      } catch (error) {
+        byId("library-job-status").textContent=
+          "Reconnecting to persisted job "+id+" · "+error.message;
+      }
+      if (monitoredArtJob===id) setTimeout(poll,1800);
+    }
+    await poll();
+  }
+  async function refreshRecentArtJobs() {
+    const response=await libraryRequest("GET","/render-jobs?limit=8");
+    const list=byId("library-recent-jobs");
+    list.replaceChildren();
+    for (const job of response.items || []) {
+      const row=document.createElement("div");
+      row.className="queue-row";
+      const title=document.createElement("span");
+      title.textContent=job.id+" · "+job.status+" · "+job.progress_pct+"%";
+      const watch=document.createElement("button");
+      watch.type="button";
+      watch.className="btn outline";
+      watch.textContent=job.status==="READY" ? "Watch" : "Track";
+      watch.disabled=job.status==="FAILED" || job.status==="CANCELLED";
+      watch.addEventListener("click",async()=>{
+        try {
+          if(job.status==="READY")await showFinishedArtJob(job.result);
+          else await monitorArtJob(job.id);
+        }catch(err){message(err.message,"error");}
+      });
+      row.append(title,watch);
+      list.append(row);
+    }
+  }
+  handle(byId("library-jobs-refresh"),"Loading jobs...",async()=>{
+    await refreshRecentArtJobs();
+  });
+  handle(byId("library-job-cancel"),"Cancelling...",async()=>{
+    if(!monitoredArtJob) throw Error("There is no active queue selection");
+    await libraryRequest("POST","/render-jobs/"+monitoredArtJob+"/cancel");
+    byId("library-job-cancel").disabled=true;
+    monitoredArtJob=null;
+    byId("library-job-status").textContent="Queued Reel cancelled";
+    await refreshRecentArtJobs();
+  });
+  handle(byId("library-render-btn"), "Submitting to render worker...", async () => {
+    const art=state.selectedLibrary;
     if (!art || !art.approved || !art.production_eligible ||
         !byId("library-rights").checked) {
-      throw Error("Approve real HD artwork and confirm your rights before rendering.");
+      throw Error("Approve real HD artwork and confirm rights before rendering.");
     }
-    const result = await libraryRequest("POST", "/renders", {
-      asset_id: art.id,
-      allow_fallback: Boolean(art.is_fallback),
-      geometry: byId("library-cutout").value,
-      motion_profile: byId("library-motion").value,
-      duration_sec: Number(byId("library-duration").value),
-      exact_fit_count: Number(byId("library-fits").value),
-      enable_sfx: byId("library-sfx").checked,
-      cutout_id: state.selectedFaceCutout && state.selectedFaceCutout.approved &&
-        state.selectedFaceCutout.asset_id === art.id
-          ? state.selectedFaceCutout.id : null,
-      seed: (Date.now() >>> 0) % 2147483647
-    });
-    const url = await protectedMedia(result.video_url);
-    byId("library-video-player").src = url;
-    byId("library-video-download").href = url;
-    byId("library-video-result").hidden = false;
-    byId("library-video-qa").textContent =
-      "Verified " + result.decoded_frames_checked + " frames · raw alignment MAD " +
-      result.raw_alignment_mad + " · exact fits: " +
-      result.exact_fit_times_sec.map(t => Number(t).toFixed(2) + "s").join(", ") +
-      " · " + (result.fallback_used ? "explicit fallback source" : "original approved source") +
-      " · NOT PUBLISHED";
-    message("Finished MP4 ready: " + result.id + ". Video passed alignment and frame QA.", "ok");
+    const request={
+      asset_id:art.id,
+      allow_fallback:Boolean(art.is_fallback),
+      geometry:byId("library-cutout").value,
+      motion_profile:byId("library-motion").value,
+      duration_sec:Number(byId("library-duration").value),
+      exact_fit_count:Number(byId("library-fits").value),
+      enable_sfx:byId("library-sfx").checked,
+      cutout_id:state.selectedFaceCutout && state.selectedFaceCutout.approved &&
+        state.selectedFaceCutout.asset_id===art.id ?
+        state.selectedFaceCutout.id:null,
+      seed:(Date.now() >>> 0)%2147483647,
+    };
+    const job=await libraryRequest("POST","/render-jobs",request);
+    byId("library-job-status").textContent="Queued "+job.id+" · rendering on worker";
+    byId("library-video-result").hidden=true;
+    await refreshRecentArtJobs();
+    monitorArtJob(job.id).catch(error=>message(error.message,"error"));
+    message("Render job saved. You can close this tab; Docker/PC worker continues.", "ok");
   });
   handle(byId("library-stage-btn"), "Preparing artwork for Reel...", async () => {
     if (!state.selectedLibrary || !state.plan || !byId("library-rights").checked) {
@@ -437,9 +517,14 @@
     state.token = token;
     const caps = await request("GET", "/capabilities");
     if (!caps.ai_enabled || !caps.configured) {
-      message("Connected to Rfactory asset library. Gemini is unavailable; browsing, uploading and reviewing artwork remain accessible.", "ok");
-      output("To generate a storyboard, enable Gemini on the backend. Asset importing does not need image-generation credits.");
+      byId("connection-state").textContent = "Connected · offline generation";
+      document.querySelector(".led").classList.add("on");
+      byId("api-token").value = "";
+      byId("api-token").placeholder = "Connected to local Rfactory";
+      message("Connected. Original artwork, cutouts and render queue are available without Gemini.", "ok");
+      output("Rendering needs only approved HD artwork and the persistent local worker.");
       await loadArtworkLibrary();
+      await refreshRecentArtJobs();
       return;
     }
     byId("connection-state").textContent = "Connected to Gemini-ready backend";
@@ -448,6 +533,7 @@
     byId("api-token").value = "";
     byId("api-token").placeholder = "Token loaded for this session";
     await loadArtworkLibrary();
+    await refreshRecentArtJobs();
   });
   handle(byId("plan-btn"), "Directing with Gemini...", async () => {
     const brief = {
