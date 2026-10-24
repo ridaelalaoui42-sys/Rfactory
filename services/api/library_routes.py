@@ -160,6 +160,7 @@ class OfflineRenderRequest(BaseModel):
     exact_fit_count: int = Field(default=5, ge=1, le=12)
     seed: int = Field(default=42041, ge=0, le=2**31 - 1)
     enable_sfx: bool = True
+    cutout_id: str | None = None
 
 
 @router.post("/renders", status_code=201)
@@ -175,6 +176,27 @@ def render_curated_artwork(
     """
     if request.geometry not in GEOMETRIES or request.motion_profile not in MOTION_PROFILES:
         raise HTTPException(status_code=422, detail="Unsupported geometry or motion")
+    face_kwargs = {}
+    if request.cutout_id is not None:
+        if not re.fullmatch(r"face_[a-f0-9]{24}", request.cutout_id):
+            raise HTTPException(status_code=422, detail="Malformed face cutout ID")
+        pack_manifest = library.root.parent.parent / "cutout_packs" / request.cutout_id / "puzzle_manifest.json"
+        if not pack_manifest.is_file():
+            raise HTTPException(status_code=404, detail="Cutout pack not found")
+        import json
+        cut = json.loads(pack_manifest.read_text(encoding="utf8"))
+        if not cut.get("approved") or cut.get("status") != "APPROVED":
+            raise HTTPException(status_code=409, detail="Cutout pack must be approved")
+        if cut.get("library_asset_id") != request.asset_id:
+            raise HTTPException(status_code=409, detail="Cutout belongs to a different source image")
+        library_asset = library.get(request.asset_id)
+        if cut.get("original_image_sha256") != library_asset["sha256"]:
+            raise HTTPException(status_code=409, detail="Canonical source changed; regenerate cutout")
+        face_kwargs = {
+            "face_mode": cut["mode"],
+            "subject_type":cut["subject_type"],
+            "face_bbox_norm":tuple(cut["face_bbox_norm"]) if cut.get("face_bbox_norm") else None,
+        }
     try:
         result = render_approved_asset(
             request.asset_id, storage_root=library.root.parent.parent,
@@ -185,6 +207,7 @@ def render_curated_artwork(
             crossings=request.exact_fit_count,
             seed=request.seed,
             enable_sfx=request.enable_sfx,
+            **face_kwargs,
         )
         # Expose an authenticated opaque video ID, not the VM's local paths.
         video_id = Path(result["video"]).parent.name
@@ -200,6 +223,8 @@ def render_curated_artwork(
             "raw_alignment_mad": result["raw_alignment_mad"],
             "provenance": result["source_provenance"],
             "fallback_used": result["explicit_fallback"],
+            "face_cutout_id":request.cutout_id,
+            "face_mode":result.get("face_mode"),
             "published": False,
         }
     except (LibraryError, ValueError) as exc:
