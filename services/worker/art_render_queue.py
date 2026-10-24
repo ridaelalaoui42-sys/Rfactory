@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import json
+import hashlib
+from PIL import Image
 import re
 import sqlite3
 import uuid
@@ -247,6 +249,15 @@ class RenderQueue:
         try:
             kwargs=dict(request)
             original=kwargs.pop("asset_id")
+            expected_pixel_hash=kwargs.pop("expected_source_pixel_sha256",None)
+            library=AssetLibrary(self.storage)
+            asset=library.get(original)
+            if not asset["approved"] or not asset["production_eligible"]:
+                raise ValueError("Source approval was revoked while queued")
+            with Image.open(library.path(original)) as source:
+                actual_pixel_hash=hashlib.sha256(source.convert("RGBA").tobytes()).hexdigest()
+            if actual_pixel_hash != expected_pixel_hash or actual_pixel_hash != asset.get("pixel_sha256"):
+                raise ValueError("Original source pixels changed between enqueue and render")
             cfg={
                 "storage_root":self.storage,
                 "allow_fallback":kwargs.pop("allow_fallback",False),
@@ -268,8 +279,9 @@ class RenderQueue:
                 self.progress(job_id,worker_id,int(5+80*done/max(total,1)))
             report=render_approved_asset(original,progress_callback=on_frame,**cfg)
             self.complete(job_id,worker_id,report)
-        except Exception:
-            # Avoid exposing private filepaths, user assets or API credentials
-            # through status polling. Full tracebacks remain in worker logs.
-            self.fail(job_id,worker_id,"Render or QA failed; inspect private worker logs")
+        except Exception as exc:
+            # Exception class only; never print auth tokens or raw traceback
+            # from a provider exception into an API-visible status response.
+            print(f"ART JOB {job_id} FAILED: {type(exc).__name__}",flush=True)
+            self.fail(job_id,worker_id,"Render, approval or QA failed; see private worker logs")
         return self.get(job_id)
