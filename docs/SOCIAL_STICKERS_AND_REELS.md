@@ -91,3 +91,24 @@ authorize use as production HD source for the main face puzzle editor.
 
 The stricter Face Asset Engine in \`services/assets/\` and the approved-source
 library remain in force.
+
+## GitHub-hosted automatic Reel builds
+
+The source-resolution cutouts and backgrounds are versioned in Git at
+[`assets/social/rfactory_social_assets_compact_v1.zip`](../assets/social/rfactory_social_assets_compact_v1.zip).
+They can be installed reproducibly into `public/rfactory-social` without a
+Cloudinary, paid model, or external file-download dependency.
+
+The [social-reels workflow](../.github/workflows/social-reels.yml) validates
+ZIP integrity and per-asset checksums, imports the pack, runs exact-fit motion
+regression tests, renders all three family-friendly H.264/AAC 1080×1920 MP4s,
+checks FFprobe codec/dimensions and per-render motion QA, and uploads the
+results as a **14-day GitHub Actions artifact**.
+
+To download a recent reel build: open **GitHub → Actions → Social puzzle reels →
+latest successful run → Artifacts → `rfactory-social-reels-…`**. You can also
+use **Run workflow** to regenerate the current presets on demand.
+
+The compact ZIP is durable in Git history; workflow video artifacts are
+temporary build outputs, not permanent media storage. The packaged stickers are
+still original-sheet reference sprites, not native-HD canonical animal subjects.
