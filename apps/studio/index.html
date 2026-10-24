@@ -15,7 +15,7 @@
       <div class="brand"><span class="brand-icon">R<span class="brand-dot">.</span></span><span><strong>Rfactory</strong><small>AI CREATIVE STUDIO</small></span></div>
       <div class="sidebar-label">WORKSPACE</div>
       <div class="nav-active">✦ &nbsp; Creative Studio</div>
-      <div class="nav-passive">▦ &nbsp; Content Library <span>Next</span></div>
+      <div class="nav-passive">▦ &nbsp; Content Library <span>Active</span></div>
       <div class="nav-passive">◷ &nbsp; Publishing Queue <span>Next</span></div>
       <div class="sidebar-foot"><span class="led"></span><span id="connection-state">Not connected</span><p>Original artwork · Controlled AI generation<br>Human approval before publishing</p></div>
     </aside>
@@ -33,9 +33,124 @@
               <div><label for="language">Language</label><select id="language"><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option><option value="ar">العربية</option></select></div>
               <div><label for="duration">Reel duration</label><select id="duration"><option value="15">15 seconds</option><option value="8">8 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option></select></div>
             </div>
-            <label for="twist">Creative twist</label><input id="twist" value="Clean perfect alignment with a delightful reveal" maxlength="250">
+            <label for="twist">Creative twist</label><input id="twist" value="Continuous perfect crossings without pauses or visual hints" maxlength="250">
             <button class="btn primary full" id="plan-btn">✦ Generate Gemini storyboard</button>
             <span class="helper">Gemini creates a distinctive art brief, caption, motion concept and voiceover script.</span>
+          </div>
+          <div class="panel" id="asset-library-panel">
+            <div class="panel-top"><span class="step">ART</span><div><h2>Original artwork library</h2><p>Real AI imagery, explicit fallback choices, no placeholder shapes.</p></div></div>
+            <p class="helper">Upload your Rfactory AI Art Pack ZIP. HD images require review before video production. Small catalog thumbnails are reference-only.</p>
+            <label for="library-pack-file">Generated asset library (ZIP)</label>
+            <input id="library-pack-file" type="file" accept=".zip,application/zip">
+            <button class="btn outline full" id="library-import-btn">↑ Install artwork pack</button>
+            <div class="grid-two">
+              <div><label for="library-category">Filter category</label>
+                <select id="library-category">
+                  <option value="animals">Animals</option><option value="characters">Characters</option>
+                  <option value="vehicles">Vehicles</option><option value="fantasy">Fantasy</option>
+                  <option value="objects">Objects</option><option value="backgrounds">Backgrounds</option>
+                </select></div>
+              <div><label for="library-quality">Quality</label>
+                <select id="library-quality"><option value="all">All artwork + references</option><option value="production">HD production candidates only</option></select></div>
+            </div>
+            <button class="btn outline full" id="library-refresh-btn">▦ Refresh artwork library</button>
+            <div id="library-status" role="status" class="helper">Connect to load library assets.</div>
+            <div id="library-grid" class="asset-grid" aria-label="Available AI and fallback artwork"></div>
+            <div id="library-selection" class="helper">Select a library image to inspect provenance.</div>
+            <label class="check-row" for="library-rights"><input id="library-rights" type="checkbox"> I confirm I may use the selected artwork.</label>
+            <div class="btn-row">
+              <button class="btn outline" id="library-approve-btn" disabled>✓ Approve HD asset</button>
+              <button class="btn primary" id="library-stage-btn" disabled>Use selected artwork</button>
+            </div>
+            <div class="face-builder" id="face-builder">
+              <h3>Face Cutout Builder</h3>
+              <p class="helper">The artwork must be completely intact. The engine extracts real face pixels—never asks AI to draw missing pieces.</p>
+              <div class="grid-two">
+                <div><label for="face-subject-type">Subject type</label>
+                <select id="face-subject-type">
+                  <option value="animal">Animal face</option>
+                  <option value="human">Human face</option>
+                  <option value="portrait">General portrait</option>
+                </select></div>
+                <div><label for="face-mode">Puzzle cutout</label>
+                <select id="face-mode">
+                  <option value="animal_face_core">Animal — full central face</option>
+                  <option value="animal_eye_band">Animal — moving eye band</option>
+                  <option value="animal_muzzle_patch">Animal — muzzle patch</option>
+                  <option value="animal_forehead_patch">Animal — forehead</option>
+                  <option value="human_three_slice_face">Human — three moving facial slices</option>
+                  <option value="human_triangle_face_puzzle">Human — three triangular fragments</option>
+                  <option value="human_eye_band">Human — eye band</option>
+                  <option value="human_nose_mouth_patch">Human — nose + mouth</option>
+                  <option value="human_feature_fragments">Human — three distinct features</option>
+                  <option value="portrait_center_mask">Portrait — central oval</option>
+                  <option value="portrait_ring_segment">Portrait — rotating ring</option>
+                  <option value="portrait_cheek_patch">Portrait — cheek</option>
+                </select></div>
+              </div>
+              <div class="face-roi-picker">
+                <p class="helper">Draw a rectangle around the real eyes, nose and muzzle. For multi-piece human faces, select the whole face.</p>
+                <canvas id="face-roi-canvas" width="420" height="360" aria-label="Face region preview; drag pointer to select a face box"></canvas>
+                <p id="face-roi-status" class="helper">Choose a library image to edit its face region. Manual coordinate entry is also available.</p>
+              </div>
+              <label for="face-manual-bbox">Optional reviewed face box — x, y, width, height (normalized 0–1)</label>
+              <input id="face-manual-bbox" type="text" placeholder="e.g. 0.24, 0.12, 0.52, 0.48">
+              <p class="helper">Human-face detection is automatic when possible. Animal positioning is an unverified estimate unless you enter a reviewed face box.</p>
+              <label class="check-row"><input id="face-clean-confirm" type="checkbox"> This artwork is a complete, clean source—not an AI-drawn fake puzzle or collage.</label>
+              <button id="face-generate-btn" class="btn outline full" disabled>✂ Generate exact cutout assets</button>
+              <div id="face-cutout-results" hidden>
+                <p id="face-cutout-status" class="helper"></p>
+                <div class="face-assets-grid">
+                  <div><strong>Original</strong><img id="face-original-preview" alt="Clean canonical source"></div>
+                  <div><strong>Hole plate</strong><img id="face-hole-preview" alt="Programmatically created hole plate"></div>
+                  <div><strong>Extracted piece</strong><img id="face-piece-preview" alt="First exact image fragment"></div>
+                  <div><strong>Mask</strong><img id="face-mask-preview" alt="Binary source mask"></div>
+                </div>
+                <button id="face-approve-btn" class="btn outline full">✓ Approve cutout geometry for rendering</button>
+                <a id="face-download-pack" class="btn outline full" href="#" download>↓ Export source + mask + pieces ZIP</a>
+              </div>
+            </div>
+            <div class="library-direct-render">
+              <h3>Produce Reel without Gemini</h3>
+              <p class="helper">Render an approved original or explicitly selected HD fallback directly. No storyboard credits needed.</p>
+              <div class="grid-two">
+                <div><label for="library-motion">Movement</label><select id="library-motion">
+                  <option value="orbit_lock">Orbital rotation</option>
+                  <option value="helix">Helical 3D style</option>
+                  <option value="bezier_sweep">Curved Bézier sweep</option>
+                  <option value="figure_eight">Figure-eight</option>
+                  <option value="spiral">Cinematic spiral</option>
+                  <option value="pendulum">Pendulum swing</option>
+                  <option value="opposed_spin">Reverse rotation</option>
+                </select></div>
+                <div><label for="library-cutout">Fragment shape</label><select id="library-cutout">
+                  <option value="organic">Organic cutout</option>
+                  <option value="jigsaw">Jigsaw</option>
+                  <option value="ellipse">Ellipse</option>
+                  <option value="ring_sector">Ring sector</option>
+                  <option value="hexagon">Hexagon</option>
+                  <option value="curved_band">Curved band</option>
+                </select></div>
+                <div><label for="library-duration">Duration</label><select id="library-duration">
+                  <option value="10" selected>10 seconds</option>
+                  <option value="12">12 seconds</option>
+                  <option value="15">15 seconds</option>
+                </select></div>
+                <div><label for="library-fits">Exact crossings</label><select id="library-fits">
+                  <option value="4">4 crossings</option>
+                  <option value="5" selected>5 crossings</option>
+                  <option value="6">6 crossings</option>
+                </select></div>
+              </div>
+              <label class="check-row" for="library-sfx"><input type="checkbox" id="library-sfx" checked> Subtle sound at crossings only</label>
+              <button class="btn primary full" id="library-render-btn" disabled>▶ Render approved artwork into a Reel</button>
+              <div id="library-video-result" hidden>
+                <video id="library-video-player" controls playsinline preload="metadata" style="width:100%;border-radius:12px;margin-top:12px;"></video>
+                <a id="library-video-download" class="btn outline full" download="rfactory-reel.mp4">↓ Download finished MP4</a>
+                <p id="library-video-qa" class="helper"></p>
+              </div>
+            </div>
+            <p class="helper">Fallback never means the Gemini image API succeeded. Nothing is silently substituted or published.</p>
           </div>
           <div class="panel" id="storyboard-panel" hidden>
             <div class="panel-top"><span class="step">02</span><div><h2>Director's cut</h2><p>Review and refine prompts before spending image/voice credits.</p></div></div>
@@ -54,7 +169,7 @@
             <div class="btn-row"><button class="btn primary" id="image-btn">✦ Generate original art</button><button class="btn outline" id="voice-btn">◉ Generate voiceover</button></div>
           </div>
           <div class="panel" id="production-panel" hidden>
-            <div class="panel-top"><span class="step">03</span><div><h2>Production & review</h2><p>AI-generated work requires inspection before video rendering.</p></div></div>
+            <div class="panel-top"><span class="step">03</span><div><h2>Production & review</h2><p>All source artwork requires inspection before video rendering.</p></div></div>
             <div id="art-status" class="muted">No artwork yet.</div><label for="edit-prompt">Refine existing artwork with Gemini</label><input id="edit-prompt" maxlength="1800" value="Improve the fine texture, shading and silhouette while preserving the character identity"><button class="btn outline full" id="refine-btn" disabled>✧ Edit this image with Nano Banana</button>
             <button class="btn outline full" id="approve-btn" disabled>✓ Approve image for production</button>
             <label for="motion-profile">Motion choreography</label>
@@ -68,7 +183,39 @@
               <option value="flip_reveal">Flip perspective reveal</option>
               <option value="zigzag">Zigzag ricochet</option>
               <option value="slide">Classic slide</option>
+              <option value="bezier_sweep">Bézier S sweep</option>
+              <option value="catmull_wave">Smooth spline wave</option>
+              <option value="figure_eight">Figure-eight trajectory</option>
+              <option value="vortex">Vortex spiral</option>
+              <option value="ricochet">Multi-harmonic ricochet</option>
+              <option value="helix">3D-style helical motion</option>
+              <option value="magnetic">Magnetic fly-through</option>
+              <option value="opposed_spin">Reverse spin</option>
             </select>
+            <button class="btn outline full" id="motion-preview-btn">◇ Preview motion path &amp; exact-fit events</button>
+            <div id="motion-inspector" class="motion-inspector" hidden>
+              <div class="motion-inspector-caption">Live deterministic trajectory preview <span id="motion-inspector-count"></span></div>
+              <svg id="motion-canvas" viewBox="0 0 360 240" role="img" aria-label="Actual movement trajectory and exact target center">
+                <defs><linearGradient id="motion-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7e87ff"/><stop offset="100%" stop-color="#70e5de"/></linearGradient></defs>
+                <path id="motion-svg-path" fill="none" stroke="url(#motion-gradient)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                <circle cx="180" cy="120" r="8" fill="none" stroke="#f0d27b" stroke-width="2" />
+                <path d="M180 100 V110 M180 130 V140 M160 120 H170 M190 120 H200" stroke="#f0d27b" opacity=".7" stroke-width="2" />
+              </svg>
+              <div id="motion-preview-times" class="helper"></div>
+            </div>
+            <label for="puzzle-geometry">Missing-piece geometry</label>
+            <select id="puzzle-geometry">
+              <option value="legacy">Original straight band</option>
+              <option value="organic">Organic irregular cutout</option>
+              <option value="jigsaw">Interlocking jigsaw piece</option>
+              <option value="ellipse">Ellipse</option>
+              <option value="curved_band">Curved band</option>
+              <option value="ring_sector">Rotating ring sector</option>
+              <option value="hexagon">Hexagon</option>
+              <option value="triangle">Triangle</option>
+              <option value="rectangle">Rectangle</option>
+            </select>
+            <p class="helper">New geometry modes apply to the Missing Piece template. Every positive fragment is extracted from the exact same source artwork.</p>
             <label for="snap-count">Exact-fit moments throughout the video</label>
             <select id="snap-count">
               <option value="0">✦ Gemini chooses the count · irregular timing</option>
@@ -79,7 +226,7 @@
               <option value="7">7 surprise matches</option>
               <option value="8">8 surprise matches</option>
             </select>
-            <p class="helper">Each match lasts briefly and occurs at a seeded, irregular moment—not only at the end. The same source pixels lock perfectly into place every time.</p>
+            <p class="helper">Each match occurs at a single seeded, irregular frame—not only at the end. Motion never pauses. The same source pixels lock perfectly into place every time.</p>
             <label for="motion-intensity">Movement intensity <output id="motion-value">1.0×</output></label>
             <input type="range" id="motion-intensity" min="0.3" max="2.0" step="0.1" value="1.0">
             <label class="check-row" for="sfx-enabled"><input type="checkbox" id="sfx-enabled" checked> Mix puzzle sound effects with narration</label><button class="btn primary full" id="render-btn" disabled>▶ Render final 9:16 Reel</button>

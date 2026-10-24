@@ -35,6 +35,10 @@ from services.assets.segmentation import (
 from services.assets.sound_fx import synthesize_puzzle_audio_wav
 from services.engine.motion_profiles import motion_pose, continuous_motion_pose, transformed_sprite, MOTION_PROFILES, MotionPose
 from services.engine.snap_timeline import build_snap_timeline, build_crossing_timeline
+from services.engine.puzzle_geometry import GEOMETRIES, cut_exact_fragment
+from services.assets.face_cutout_engine import FACE_MODES, face_cutout
+from services.assets.fit_validator import validate_face_bundle
+from services.assets.asset_packager import package_face_bundle
 
 
 @dataclass
@@ -68,6 +72,12 @@ class RenderConfig:
     continuous_motion: bool = True  # exact matches are single crossing frames; no freeze
     sound_mode: str = "match_only"  # sound at exact fit; no ticking or music
     snap_count: int = 0  # 0 = follow cycles; positive sets exact number of solves
+    puzzle_geometry: str = "legacy"  # optional new organic/jigsaw/ring/etc cutouts
+
+    face_mode: str = ""  # CANONICAL_FACE: meaningful animal/human feature fragments
+    subject_type: str = "animal"  # animal, human or portrait
+    face_bbox_norm: tuple[float,float,float,float] | None = None
+    face_asset_seed: int | None = None  # approved source mask seed; motion seed remains independent
 
 
 @dataclass
@@ -99,6 +109,33 @@ class BoundedFrameCache(OrderedDict):
         super().__setitem__(key, value)
         while len(self) > 5:
             self.popitem(last=False)
+
+
+def contain_original_rgba(
+    original: np.ndarray, target_wh: tuple[int,int],
+    bbox_norm: tuple[float,float,float,float] | None = None,
+) -> tuple[np.ndarray,tuple[float,float,float,float] | None]:
+    """Letterbox original intact art without stretching animal/human faces."""
+    target_w,target_h=target_wh
+    original_h,original_w=original.shape[:2]
+    ratio=min(target_w/original_w,target_h/original_h)
+    scaled_w=max(1,round(original_w*ratio))
+    scaled_h=max(1,round(original_h*ratio))
+    scaled=cv2.resize(original,(scaled_w,scaled_h),interpolation=cv2.INTER_LANCZOS4)
+    canvas=np.zeros((target_h,target_w,4),dtype=np.uint8)
+    offset_x=(target_w-scaled_w)//2
+    offset_y=(target_h-scaled_h)//2
+    canvas[offset_y:offset_y+scaled_h,offset_x:offset_x+scaled_w]=scaled
+    mapped=None
+    if bbox_norm is not None:
+        x,y,w,h=bbox_norm
+        mapped=(
+            (offset_x+x*scaled_w)/target_w,
+            (offset_y+y*scaled_h)/target_h,
+            w*scaled_w/target_w,
+            h*scaled_h/target_h,
+        )
+    return canvas,mapped
 
 
 def hex_to_rgb(hex_str: str) -> Tuple[int, int, int]:
@@ -200,6 +237,15 @@ class PuzzleVideoRenderer:
         start_t = time.time()
         if config.motion_profile not in MOTION_PROFILES:
             raise ValueError("Unsupported motion profile: " + config.motion_profile)
+        if config.puzzle_geometry != "legacy" and config.puzzle_geometry not in GEOMETRIES:
+            raise ValueError("Unsupported puzzle geometry: " + config.puzzle_geometry)
+        if config.puzzle_geometry != "legacy" and config.template_id != "MISSING_PIECE_SLIDE":
+            raise ValueError("Custom geometry currently requires MISSING_PIECE_SLIDE template")
+        if config.template_id == "CANONICAL_FACE":
+            if config.face_mode not in FACE_MODES:
+                raise ValueError("CANONICAL_FACE requires a supported face mode")
+            if config.subject_type not in {"animal","human","portrait"}:
+                raise ValueError("Unsupported face subject type")
         if config.sound_mode not in {"match_only", "music_and_ticks"}:
             raise ValueError("Unsupported sound mode")
         if not 0.0 <= config.motion_intensity <= 2.0:
@@ -352,25 +398,101 @@ class PuzzleVideoRenderer:
                 frame_cache[animal_dx] = (b_data, frame)
                 return b_data, frame, is_aligned
 
+        elif config.template_id == "CANONICAL_FACE":
+            # One approved, clean source image drives the plate, positive pieces
+            # and the exact solved state. Never use an AI-drawn cutout collage.
+            face_w, face_h = 860, 860
+            source_rgba,normalized_face_box = contain_original_rgba(
+                raw_animal_rgba,(face_w,face_h),config.face_bbox_norm
+            )
+            face_bundle = face_cutout(
+                source_rgba, config.face_mode, subject_type=config.subject_type,
+                seed=config.face_asset_seed if config.face_asset_seed is not None else config.seed,
+                face_bbox_norm=normalized_face_box,
+            )
+            face_qa = validate_face_bundle(face_bundle)
+            pixel_match_mad = face_qa["exact_raw_rgba_mad"]
+            face_x, face_y = (w-face_w)//2, (h-face_h)//2-40
+            alpha_composite_inplace(
+                static_base_rgb, face_bundle.hole_plate_rgba,
+                (face_x,face_y),
+            )
+            package_face_bundle(
+                face_bundle, job_dir/"cutout_assets",
+                provenance="approved_source:" + str(config.asset_path or config.species),
+                approved=False,
+            )
+            # Multi-piece fragments have independent spatial paths. All
+            # fragments cross identity on precisely the same single frame.
+            # No status lights, pauses, solve overlay or victory animation.
+            def get_cycle_frame(c_idx: int) -> Tuple[bytes,np.ndarray,bool]:
+                phase = phase_for_frame(c_idx)
+                main_pose = _resolve_pose(
+                    config.motion_profile, phase,
+                    max(200,config.offset_distance_px*1.4),
+                    config.hold_ratio,config.seed,config.motion_intensity,
+                    "horizontal",
+                )
+                if c_idx in frame_cache:
+                    data, frame = frame_cache[c_idx]
+                    return data,frame,main_pose.locked
+                frame=static_base_rgb.copy()
+                for idx, piece in enumerate(face_bundle.pieces):
+                    x,y,_,_=piece.bounds_xywh
+                    pose = _resolve_pose(
+                        config.motion_profile,phase,
+                        max(200,config.offset_distance_px*(1.3+idx*.17)),
+                        config.hold_ratio,config.seed+idx*37,
+                        config.motion_intensity,
+                        "horizontal" if idx%2==0 else "vertical",
+                    )
+                    draw_motion_sprite(
+                        frame,piece.piece_rgba,
+                        (face_x+x,face_y+y),pose,
+                    )
+                data=frame.tobytes()
+                frame_cache[c_idx]=(data,frame)
+                return data,frame,main_pose.locked
+
         elif config.template_id == "MISSING_PIECE_SLIDE":
             animal_w, animal_h = 860, 860
             animal_rgba = cv2.resize(raw_animal_rgba, (animal_w, animal_h), interpolation=cv2.INTER_LANCZOS4)
-            mp_bundle = extract_missing_piece_bundle(
-                animal_rgba,
-                slice_x_ratio=config.slice_x_ratio,
-                placeholder_color=config.placeholder_color_rgba,
-            )
-            pixel_match_mad = mp_bundle.pixel_match_mad
-
             animal_x = (w - animal_w) // 2
             animal_y = (h - animal_h) // 2 - 40
 
-            alpha_composite_inplace(static_base_rgb, mp_bundle.base_with_placeholder_rgba, (animal_x, animal_y))
+            if config.puzzle_geometry == "legacy":
+                mp_bundle = extract_missing_piece_bundle(
+                    animal_rgba,
+                    slice_x_ratio=config.slice_x_ratio,
+                    placeholder_color=config.placeholder_color_rgba,
+                )
+                pixel_match_mad = mp_bundle.pixel_match_mad
+                base_rgba = mp_bundle.base_with_placeholder_rgba
+                piece_rgba = mp_bundle.extracted_piece_rgba
+                target_px = animal_x + mp_bundle.alignment_target_xy[0]
+                target_py = animal_y + mp_bundle.alignment_target_xy[1]
+            else:
+                # Canonical texture is sampled ONLY once, from the image that
+                # also defines the negative space. This is true jigsaw geometry,
+                # not an independently generated visual lookalike.
+                fragment_w = int(round(animal_w * 0.38))
+                fragment_h = int(round(animal_h * 0.29))
+                fragment_x = int(round(animal_w * 0.31))
+                fragment_y = int(round(animal_h * 0.33))
+                cut = cut_exact_fragment(
+                    animal_rgba,
+                    (fragment_x, fragment_y, fragment_w, fragment_h),
+                    geometry=config.puzzle_geometry,
+                    seed=config.seed,
+                )
+                pixel_match_mad = 0.0
+                base_rgba = cut.base_rgba
+                piece_rgba = cut.piece_rgba
+                target_px = animal_x + fragment_x
+                target_py = animal_y + fragment_y
 
-            piece_rgba = mp_bundle.extracted_piece_rgba
+            alpha_composite_inplace(static_base_rgb, base_rgba, (animal_x, animal_y))
             ph, _ = piece_rgba.shape[:2]
-            target_px = animal_x + mp_bundle.alignment_target_xy[0]
-            target_py = animal_y + mp_bundle.alignment_target_xy[1]
 
             def get_cycle_frame(c_idx: int) -> Tuple[bytes, np.ndarray, bool]:
                 cycle_p = phase_for_frame(c_idx)

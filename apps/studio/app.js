@@ -3,7 +3,8 @@
 (() => {
   "use strict";
   const byId = (id) => document.getElementById(id);
-  const state = { token: "", plan: null, image: null, voice: null, render: null, urls: [] };
+  const state = { token: "", plan: null, image: null, voice: null, render: null,
+    selectedLibrary: null, selectedFaceCutout: null, libraryItems: [], urls: [] };
   const apiBase = "/api/v1/ai";
 
   function message(text, category = "") {
@@ -52,6 +53,185 @@
     if (!response.ok) throw Error(body.detail || "Artwork import failed");
     return body;
   }
+  async function libraryRequest(method, path, payload) {
+    if (!state.token) throw Error("Connect your Rfactory backend first.");
+    const headers = {Authorization: "Bearer " + state.token};
+    if (payload !== undefined) headers["Content-Type"] = "application/json";
+    const response = await fetch("/api/v1/library" + path, {
+      method, headers, cache:"no-store",
+      body: payload === undefined ? undefined : JSON.stringify(payload),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw Error(result.detail || "Asset library request failed");
+    return result;
+  }
+  const facePicker = {
+    image:null, selected:null, dragStart:null,
+    inset:{x:0,y:0,w:420,h:360},
+  };
+  function drawFacePicker() {
+    const canvas=byId("face-roi-canvas");
+    const ctx=canvas.getContext("2d");
+    ctx.fillStyle="#17253c";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    if (!facePicker.image) return;
+    const im=facePicker.image;
+    const scale=Math.min(canvas.width/im.naturalWidth,canvas.height/im.naturalHeight);
+    const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
+    const x=(canvas.width-w)/2,y=(canvas.height-h)/2;
+    facePicker.inset={x,y,w,h};
+    ctx.drawImage(im,x,y,w,h);
+    if (facePicker.selected) {
+      const b=facePicker.selected;
+      ctx.lineWidth=3;ctx.strokeStyle="#47f0cf";
+      ctx.fillStyle="rgba(27,185,153,.15)";
+      ctx.fillRect(x+b.x*w,y+b.y*h,b.w*w,b.h*h);
+      ctx.strokeRect(x+b.x*w,y+b.y*h,b.w*w,b.h*h);
+    }
+  }
+  function facePoint(event) {
+    const canvas=byId("face-roi-canvas");
+    const rect=canvas.getBoundingClientRect();
+    const px=(event.clientX-rect.left)*canvas.width/rect.width;
+    const py=(event.clientY-rect.top)*canvas.height/rect.height;
+    const b=facePicker.inset;
+    return {
+      x:Math.max(0,Math.min(1,(px-b.x)/b.w)),
+      y:Math.max(0,Math.min(1,(py-b.y)/b.h)),
+    };
+  }
+  byId("face-roi-canvas").addEventListener("pointerdown",event=>{
+    if (!facePicker.image)return;
+    facePicker.dragStart=facePoint(event);
+    byId("face-roi-canvas").setPointerCapture(event.pointerId);
+  });
+  byId("face-roi-canvas").addEventListener("pointermove",event=>{
+    if (!facePicker.dragStart || !facePicker.image)return;
+    const end=facePoint(event),start=facePicker.dragStart;
+    facePicker.selected={
+      x:Math.min(start.x,end.x),y:Math.min(start.y,end.y),
+      w:Math.abs(end.x-start.x),h:Math.abs(end.y-start.y),
+    };
+    drawFacePicker();
+  });
+  byId("face-roi-canvas").addEventListener("pointerup",event=>{
+    if (!facePicker.dragStart)return;
+    facePicker.dragStart=null;
+    const b=facePicker.selected;
+    if (!b || b.w<.04 || b.h<.04) {
+      byId("face-roi-status").textContent="Drag a larger rectangle over the face.";
+      return;
+    }
+    byId("face-manual-bbox").value=[b.x,b.y,b.w,b.h].map(v=>v.toFixed(4)).join(", ");
+    byId("face-roi-status").textContent=
+      "Reviewed region selected: "+byId("face-manual-bbox").value+
+      ". This controls which original source pixels are cut out.";
+    drawFacePicker();
+  });
+  async function loadFaceSourcePreview(item) {
+    facePicker.image=null;
+    facePicker.selected=null;
+    drawFacePicker();
+    byId("face-manual-bbox").value="";
+    byId("face-roi-status").textContent="Loading full-resolution original...";
+    const blob=await protectedMedia(item.media_url);
+    // No token in URL. The blob is fetched using authenticated headers.
+    const im=new Image();
+    im.onload=()=>{
+      if (!state.selectedLibrary || state.selectedLibrary.id!==item.id)return;
+      facePicker.image=im;
+      byId("face-roi-status").textContent=
+        "Drag over the face (eyes + muzzle, or full human face), then generate exact masks.";
+      drawFacePicker();
+    };
+    im.onerror=()=>{byId("face-roi-status").textContent="Could not decode preview; enter face box manually."};
+    im.src=blob;
+  }
+  function refreshLibraryControls() {
+    const asset = state.selectedLibrary;
+    byId("library-approve-btn").disabled =
+      !asset || !asset.production_eligible || asset.approved;
+    byId("library-stage-btn").disabled =
+      !asset || !asset.production_eligible || !asset.approved ||
+      !state.plan || !byId("library-rights").checked;
+    byId("library-render-btn").disabled =
+      !asset || !asset.production_eligible || !asset.approved ||
+      !byId("library-rights").checked;
+    byId("face-generate-btn").disabled =
+      !asset || !asset.production_eligible || !asset.approved ||
+      !byId("library-rights").checked || !byId("face-clean-confirm").checked;
+  }
+  async function loadArtworkLibrary() {
+    const category = byId("library-category").value;
+    const productionOnly = byId("library-quality").value === "production";
+    const result = await libraryRequest("GET",
+      "/assets?category=" + encodeURIComponent(category) +
+      "&production_only=" + (productionOnly ? "true" : "false") + "&limit=100");
+    state.libraryItems = result.items;
+    const grid = byId("library-grid");
+    grid.replaceChildren();
+    state.selectedLibrary = null;
+    state.selectedFaceCutout = null;
+    byId("face-cutout-results").hidden = true;
+    byId("library-selection").textContent = "Choose an image to inspect source and quality.";
+    const records = result.items.slice(0, 24);
+    byId("library-status").textContent =
+      result.items.length + " matching images · " +
+      result.items.filter(item => item.production_eligible).length +
+      " HD candidates · " + records.length + " previews displayed";
+    for (const item of records) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "library-tile";
+      card.setAttribute("aria-label", "Select " + item.subject);
+      const image = document.createElement("img");
+      image.alt = item.subject;
+      image.loading = "lazy";
+      const title = document.createElement("strong");
+      title.textContent = item.subject;
+      const badge = document.createElement("small");
+      badge.textContent = item.production_eligible
+        ? (item.is_fallback ? "FALLBACK · HD" : "HD · " + item.tier)
+        : "REFERENCE ONLY";
+      card.append(image, title, badge);
+      card.addEventListener("click", () => {
+        state.selectedLibrary = item;
+        state.selectedFaceCutout = null;
+        byId("face-cutout-results").hidden = true;
+        loadFaceSourcePreview(item).catch(error=>
+          message("Face source preview: "+error.message, "error"));
+        grid.querySelectorAll(".library-tile").forEach(el => el.classList.remove("selected"));
+        card.classList.add("selected");
+        byId("library-selection").textContent =
+          item.subject + " · " + item.width + "×" + item.height +
+          " · " + item.provenance + " · " + item.review_status +
+          (item.is_fallback ? " · explicit fallback artwork" : "") +
+          (item.production_eligible ? "" : " · not usable in a final Reel");
+        refreshLibraryControls();
+      });
+      grid.append(card);
+      // Protected blob URLs: never expose an administrator bearer token in src.
+      protectedMedia(item.media_url).then(url => {
+        if (card.isConnected) image.src = url;
+      }).catch(() => { badge.textContent += " · preview unavailable"; });
+    }
+    refreshLibraryControls();
+  }
+  async function importArtworkPack(file) {
+    if (!state.token) throw Error("Connect first.");
+    if (!file || file.size > 60 * 1024 * 1024) {
+      throw Error("Select a valid Rfactory ZIP under 60 MB.");
+    }
+    const data = new FormData();
+    data.append("file", file, file.name);
+    const response = await fetch("/api/v1/library/import-pack", {
+      method:"POST", headers:{Authorization:"Bearer " + state.token},
+      body:data, cache:"no-store",
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw Error(body.detail || "Artwork-pack import failed");
+    return body;
+  }
   async function protectedMedia(relativeUrl) {
     const response = await fetch(relativeUrl, {
       headers: { Authorization: "Bearer " + state.token }, cache: "no-store",
@@ -88,6 +268,7 @@
     byId("refine-btn").disabled = !state.image;
     byId("approve-btn").disabled = !state.image || state.image.status === "APPROVED";
     byId("render-btn").disabled = !state.plan || !state.image || state.image.status !== "APPROVED";
+    refreshLibraryControls();
   }
   function resetFromPlan() {
     state.image = null;
@@ -101,14 +282,164 @@
     byId("art-status").textContent = "Generate unique AI artwork using the director's prompt.";
     updateButtons();
   }
+  handle(byId("library-import-btn"), "Importing artwork ZIP...", async () => {
+    const file = byId("library-pack-file").files[0];
+    const result = await importArtworkPack(file);
+    message("Installed " + result.imported + " assets: " +
+      result.production_candidates + " HD candidates, " +
+      result.reference_only + " preview-only references. Review before use.", "ok");
+    await loadArtworkLibrary();
+  });
+  handle(byId("library-refresh-btn"), "Refreshing...", async () => {
+    await loadArtworkLibrary();
+  });
+  byId("library-category").addEventListener("change", () => {
+    loadArtworkLibrary().catch(error => message(error.message, "error"));
+  });
+  byId("library-quality").addEventListener("change", () => {
+    loadArtworkLibrary().catch(error => message(error.message, "error"));
+  });
+  byId("library-rights").addEventListener("change", refreshLibraryControls);
+  handle(byId("library-approve-btn"), "Reviewing HD asset...", async () => {
+    if (!state.selectedLibrary) throw Error("Select a production-quality asset.");
+    const record = await libraryRequest("POST",
+      "/assets/" + state.selectedLibrary.id + "/approve");
+    state.selectedLibrary = record;
+    message("Approved " + record.subject + " as a vetted original artwork source.", "ok");
+    await loadArtworkLibrary();
+  });
+  async function faceRequest(method, route, payload) {
+    if (!state.token) throw Error("Connect backend before creating cutouts.");
+    const headers={Authorization:"Bearer "+state.token};
+    if (payload !== undefined) headers["Content-Type"]="application/json";
+    const reply=await fetch("/api/v1/assets"+route,{
+      method,headers,cache:"no-store",
+      body:payload === undefined ? undefined : JSON.stringify(payload),
+    });
+    const body=await reply.json().catch(() => ({}));
+    if (!reply.ok) throw Error(body.detail || "Face asset request failed");
+    return body;
+  }
+  byId("face-clean-confirm").addEventListener("change", refreshLibraryControls);
+  byId("face-subject-type").addEventListener("change", () => {
+    const subject=byId("face-subject-type").value;
+    const options={
+      animal:"animal_face_core",
+      human:"human_three_slice_face",
+      portrait:"portrait_center_mask",
+    };
+    byId("face-mode").value=options[subject];
+  });
+  handle(byId("face-generate-btn"), "Cutting source image pixels...", async () => {
+    const asset=state.selectedLibrary;
+    if (!asset || !asset.approved || !asset.production_eligible)
+      throw Error("Approve an HD source image first.");
+    if (!byId("face-clean-confirm").checked)
+      throw Error("Confirm that the source artwork is intact (no AI-drawn cutouts).");
+    const raw=byId("face-manual-bbox").value.trim();
+    let bbox=null;
+    if (raw) {
+      bbox=raw.split(",").map(v=>Number(v.trim()));
+      if (bbox.length!==4 || bbox.some(v=>!Number.isFinite(v)))
+        throw Error("Face bbox must contain four normalized numbers: x,y,w,h");
+    }
+    const result=await faceRequest("POST","/cutout",{
+      asset_id:asset.id,
+      mode:byId("face-mode").value,
+      subject_type:byId("face-subject-type").value,
+      clean_source_confirmed:true,
+      acknowledge_source_license:byId("library-rights").checked,
+      face_bbox_norm:bbox,
+      seed:42041,
+    });
+    state.selectedFaceCutout={...result,approved:false,asset_id:asset.id};
+    byId("face-cutout-results").hidden=false;
+    byId("face-cutout-status").textContent =
+      "Exact reconstruction MAD = "+result.qa.exact_raw_rgba_mad+" · "+
+      result.piece_count+" real source pieces · face selection: "+
+      result.detection_method + " · Awaiting approval";
+    const previews=[
+      ["face-original-preview",result.images.source],
+      ["face-hole-preview",result.images.hole_plate],
+      ["face-piece-preview",result.images.pieces[0]],
+      ["face-mask-preview",result.images.masks[0]],
+    ];
+    for (const [id,url] of previews) byId(id).src=await protectedMedia(url);
+    byId("face-download-pack").href=await protectedMedia(
+      "/api/v1/assets/"+result.id+"/download"
+    );
+    byId("face-download-pack").download=result.id+".zip";
+    byId("face-approve-btn").disabled=false;
+    message("Real clean-source cutouts generated; inspect images and approve.", "ok");
+  });
+  handle(byId("face-approve-btn"), "Approving exact-fit pieces...", async () => {
+    if (!state.selectedFaceCutout) throw Error("Generate a cutout first.");
+    const result=await faceRequest("POST",
+      "/"+state.selectedFaceCutout.id+"/approve");
+    state.selectedFaceCutout.approved=true;
+    byId("face-approve-btn").disabled=true;
+    byId("face-cutout-status").textContent +=
+      " · APPROVED for deterministic face-puzzle rendering";
+    message("Face-cutout pack approved. Render an exact-match MP4.", "ok");
+  });
+  handle(byId("library-render-btn"), "Rendering real-image MP4...", async () => {
+    const art = state.selectedLibrary;
+    if (!art || !art.approved || !art.production_eligible ||
+        !byId("library-rights").checked) {
+      throw Error("Approve real HD artwork and confirm your rights before rendering.");
+    }
+    const result = await libraryRequest("POST", "/renders", {
+      asset_id: art.id,
+      allow_fallback: Boolean(art.is_fallback),
+      geometry: byId("library-cutout").value,
+      motion_profile: byId("library-motion").value,
+      duration_sec: Number(byId("library-duration").value),
+      exact_fit_count: Number(byId("library-fits").value),
+      enable_sfx: byId("library-sfx").checked,
+      cutout_id: state.selectedFaceCutout && state.selectedFaceCutout.approved &&
+        state.selectedFaceCutout.asset_id === art.id
+          ? state.selectedFaceCutout.id : null,
+      seed: (Date.now() >>> 0) % 2147483647
+    });
+    const url = await protectedMedia(result.video_url);
+    byId("library-video-player").src = url;
+    byId("library-video-download").href = url;
+    byId("library-video-result").hidden = false;
+    byId("library-video-qa").textContent =
+      "Verified " + result.decoded_frames_checked + " frames · raw alignment MAD " +
+      result.raw_alignment_mad + " · exact fits: " +
+      result.exact_fit_times_sec.map(t => Number(t).toFixed(2) + "s").join(", ") +
+      " · " + (result.fallback_used ? "explicit fallback source" : "original approved source") +
+      " · NOT PUBLISHED";
+    message("Finished MP4 ready: " + result.id + ". Video passed alignment and frame QA.", "ok");
+  });
+  handle(byId("library-stage-btn"), "Preparing artwork for Reel...", async () => {
+    if (!state.selectedLibrary || !state.plan || !byId("library-rights").checked) {
+      throw Error("Select an approved HD image, create a storyboard and confirm artwork rights.");
+    }
+    const result = await libraryRequest("POST",
+      "/assets/" + state.selectedLibrary.id + "/stage", {
+        plan_id: state.plan.id, acknowledge_source_license: true
+      });
+    state.image = result;
+    activatePreview("image", await protectedMedia(state.image.media_url));
+    byId("production-panel").hidden = false;
+    byId("art-status").textContent =
+      "Library asset staged: " + (result.fallback_used ? "EXPLICIT FALLBACK" : "approved original") +
+      " · image approval required before rendering.";
+    message("Artwork staged from the library; no Gemini image generation was claimed.", "ok");
+    output("Review the art and approve the staged image to render this puzzle.");
+    updateButtons();
+  });
   handle(byId("connect"), "Connecting...", async () => {
     const token = byId("api-token").value.trim();
     if (!token) throw Error("Enter your backend access token.");
     state.token = token;
     const caps = await request("GET", "/capabilities");
     if (!caps.ai_enabled || !caps.configured) {
-      message("The backend is reachable, but Gemini is disabled or has no server-side API key.", "error");
-      output("Set RFACTORY_AI_ENABLED=true and configure GEMINI_API_KEY on the server.");
+      message("Connected to Rfactory asset library. Gemini is unavailable; browsing, uploading and reviewing artwork remain accessible.", "ok");
+      output("To generate a storyboard, enable Gemini on the backend. Asset importing does not need image-generation credits.");
+      await loadArtworkLibrary();
       return;
     }
     byId("connection-state").textContent = "Connected to Gemini-ready backend";
@@ -116,6 +447,7 @@
     message("Studio connected. Gemini image, storyboard and TTS capabilities are available.", "ok");
     byId("api-token").value = "";
     byId("api-token").placeholder = "Token loaded for this session";
+    await loadArtworkLibrary();
   });
   handle(byId("plan-btn"), "Directing with Gemini...", async () => {
     const brief = {
@@ -158,6 +490,7 @@
     message("Artwork imported locally without paid image generation.", "ok");
     output("Imported image ready for approval. Gemini image credits were not used.");
     updateButtons();
+    refreshLibraryControls();
   });
   handle(byId("image-btn"), "Generating Nano Banana artwork...", async () => {
     if (!state.plan) throw Error("Create a storyboard first.");
@@ -214,6 +547,42 @@
     byId("art-status").textContent = "✓ Artwork approved for this Reel.";
     message("Artwork approved. The renderer can now use this exact generated subject.", "ok");
   });
+  handle(byId("motion-preview-btn"), "Checking motion...", async () => {
+    if (!state.token) throw Error("Enter your backend access token before previewing.");
+    const params = {
+      profile: byId("motion-profile").value || state.plan?.plan?.motion_profile || "orbit_lock",
+      fps: 30,
+      duration_sec: Number(byId("duration").value),
+      crossing_count: Number(byId("snap-count").value) || 5,
+      seed: 42041,
+      travel_px: 210,
+      intensity: Number(byId("motion-intensity").value),
+      samples: 320,
+    };
+    const result = await fetch("/api/v1/creative/motion/preview", {
+      method: "POST",
+      headers: {"Content-Type":"application/json",Authorization:"Bearer "+state.token},
+      body: JSON.stringify(params),
+      cache: "no-store"
+    });
+    const reply = await result.json();
+    if (!result.ok) throw Error(reply.detail || "Motion preview failed");
+    const maxDist = Math.max(1, ...reply.samples.map(p => Math.max(Math.abs(p.x),Math.abs(p.y))));
+    const factor = Math.min(0.78,110 / maxDist);
+    const points = reply.samples.map(p => [
+      +(180+p.x*factor).toFixed(2),
+      +(120+p.y*factor).toFixed(2)
+    ]);
+    byId("motion-svg-path").setAttribute("d", points.map((xy,i) =>
+      (i ? "L" : "M") + xy[0]+" "+xy[1]).join(" "));
+    byId("motion-inspector").hidden = false;
+    byId("motion-inspector-count").textContent = reply.crossing_count + " crossings";
+    byId("motion-preview-times").textContent =
+      "Exact-fit frames: " + reply.crossing_frames.join(", ") +
+      " · at " + reply.crossing_times_sec.map(t => t.toFixed(2)+"s").join(" · ") +
+      " · no pause or exported visual hints.";
+    message("Real deterministic motion path loaded; crossing markers are preview-only.", "ok");
+  });
   handle(byId("render-btn"), "Rendering Reel on server...", async () => {
     if (!state.plan || !state.image || state.image.status !== "APPROVED") {
       throw Error("Approve AI artwork before rendering.");
@@ -225,6 +594,7 @@
       duration_sec: Number(byId("duration").value),
       sfx_enabled: byId("sfx-enabled").checked,
       motion_profile: byId("motion-profile").value || null,
+      puzzle_geometry: byId("puzzle-geometry").value,
       motion_intensity: Number(byId("motion-intensity").value),
       snap_count: Number(byId("snap-count").value),
     });

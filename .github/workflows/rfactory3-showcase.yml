@@ -1,0 +1,75 @@
+name: Rfactory 3 six-video motion matrix
+
+on:
+  push:
+    branches: [codex/rfactory-3-advanced-engine]
+    paths:
+      - .github/workflows/rfactory3-showcase.yml
+      - scripts/render_rfactory3_showcase.py
+      - services/engine/**
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: "Reel duration (2-30 seconds)"
+        required: false
+        default: "3"
+      count:
+        description: "Exact-fit crossings (1-12)"
+        required: false
+        default: "3"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  motion-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install Python and video dependencies
+        run: |
+          pip install -r requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+      - name: Render six independent motion and geometry variants
+        env:
+          DURATION: ${{ inputs.duration || '3' }}
+          COUNT: ${{ inputs.count || '3' }}
+        run: python -m scripts.render_rfactory3_showcase --duration "$DURATION" --count "$COUNT"
+      - name: Verify manifest covers all six video outputs
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("storage/rfactory3-showcase")
+          cases=json.loads((root/"manifest.json").read_text())
+          assert len(cases)==6
+          assert len({c["motion_profile"] for c in cases})==6
+          assert len({c["puzzle_geometry"] for c in cases})==6
+          for c in cases:
+              assert (root/c["video"]).is_file()
+              assert c["raw_exact_match_mad"]==0.0
+              assert c["decoded_frames_checked"]==round(c["duration_sec"]*30)
+              assert len(c["exact_fit_times_sec"])>=1
+          print("PASS: six distinct playable QA-verified showcase renders")
+          PY
+      - name: Upload playable videos and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: rfactory3-six-video-showcase
+          path: |
+            storage/rfactory3-showcase/**/*.mp4
+            storage/rfactory3-showcase/**/*.png
+            storage/rfactory3-showcase/**/*.json
+            storage/rfactory3-showcase/manifest.json
+          if-no-files-found: error
+          retention-days: 14

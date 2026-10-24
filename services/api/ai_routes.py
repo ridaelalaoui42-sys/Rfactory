@@ -15,6 +15,7 @@ from services.ai.studio import (
     CreativeBrief, ImageBrief, VoiceBrief, GeminiCreativeStudio,
     ConfigurationError, ProviderError, MODELS, VOICES, enabled,
 )
+from services.ai.provider_catalog import discover_gemini_models, ProviderCatalogError
 from services.ai.workflow import (
     StudioStore, StudioWorkflow, BudgetExceeded, ApprovalRequired, NotFoundError,
 )
@@ -53,9 +54,10 @@ class RenderRequest(BaseModel):
     voice_id: str | None = None
     duration_sec: float = Field(default=15.0, ge=8, le=30)
     sfx_enabled: bool = True
-    motion_profile: Literal["slide", "spin_snap", "orbit_lock", "pendulum", "spiral", "elastic", "flip_reveal", "zigzag"] | None = None
+    motion_profile: str | None = Field(default=None, max_length=32, description="One of the supported motion profiles from /api/v1/creative/capabilities")
     motion_intensity: float = Field(default=1.0, ge=0.0, le=2.0)
     snap_count: int = Field(default=0, ge=0, le=12, description="0 uses storyboard cycles; 1-12 chooses number of irregular exact-fit events")
+    puzzle_geometry: str = Field(default="legacy", max_length=32)
 
 
 def _run(op):
@@ -90,6 +92,20 @@ def get_capabilities() -> dict:
         "auto_publish_enabled": False,
         "auth": "backend bearer token (replace with OAuth/JWT before mobile public launch)",
     }
+
+
+@router.get("/provider-models")
+def discover_provider_models(limit: int = 100):
+    """Query the real provider on demand; no billing/free entitlement claims."""
+    if not enabled():
+        raise HTTPException(status_code=503, detail="Enable Gemini on the server first")
+    try:
+        studio = GeminiCreativeStudio()
+        return discover_gemini_models(studio.client, limit=limit)
+    except (ConfigurationError, ProviderCatalogError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/plans", status_code=201)
@@ -136,7 +152,7 @@ def render_reel(req: RenderRequest, workflow: StudioWorkflow = Depends(get_workf
     return _run(lambda: workflow.render(req.plan_id, req.image_id, req.voice_id,
                                         req.duration_sec, req.sfx_enabled,
                                         req.motion_profile, req.motion_intensity,
-                                        req.snap_count))
+                                        req.snap_count, req.puzzle_geometry))
 
 
 @router.get("/library")

@@ -10,6 +10,7 @@ import base64
 import io
 import json
 import os
+import hashlib
 from pathlib import Path
 from typing import Any, Literal
 
@@ -169,6 +170,10 @@ class GeminiCreativeStudio:
             "high-retention vertical Reel with a real visual challenge, elegant art direction, "
             "and natural, brief narration. Avoid generic stock-vector style. "
             "Only original fictional/cartoon subjects unless permission for real people is verified. "
+            "The generated artwork is the COMPLETE CLEAN SOURCE, never a pre-cut puzzle. "
+            "Do not ask the image model for holes, missing patches, detached faces, "
+            "floating fragments, jigsaw outlines, collages, motion streaks or previews. "
+            "All cuts are performed later using the deterministic face-asset engine. "
             "For slicing puzzles use one single, isolated complete subject, centered, "
             "with natural anatomy, plain white surrounding canvas, without labels, words, "
             "watermarks, multiple subjects or clipping. Color/style consistency matters. "
@@ -212,16 +217,54 @@ class GeminiCreativeStudio:
             "clear realistic anatomy, sharp silhouette, subject occupies roughly 75% of the frame. "
             "One complete isolated subject on PURE WHITE (#FFFFFF), evenly lit, "
             "no text, no watermark, no border, no collage, no extra subjects, "
-            "no contact shadows. Keep generous whitespace on every edge."
+            "no contact shadows. Keep generous whitespace on every edge. "
+            "CRITICAL: COMPLETE intact eyes, mouth and face. NO puzzle cuts, "
+            "NO detached elements, NO missing regions, NO hole in the portrait, "
+            "NO floating duplicate face parts or animated fragments."
             if brief.transparent_subject
             else brief.prompt + f"\nArt direction: {brief.style}."
         )
-        response = self.client.interactions.create(
-            model=brief.model,
-            input=prompt,
-            response_format={"type": "image", "mime_type": "image/png", "aspect_ratio": "1:1"},
-        )
-        payload = getattr(getattr(response, "output_image", None), "data", None)
+        # Preferred Google Interactions endpoint for current Nano Banana
+        # models. Legacy generate_content remains for compatible older
+        # providers and test clients without an interactions implementation.
+        if hasattr(self.client, "interactions") and hasattr(self.client.interactions, "create"):
+            response = self.client.interactions.create(
+                model=brief.model, input=prompt,
+                response_format={"type": "image", "aspect_ratio": "1:1", "image_size": "1K"},
+            )
+            payload = getattr(getattr(response, "output_image", None), "data", None)
+        elif hasattr(self.client, "models") and hasattr(self.client.models, "generate_content"):
+            try:
+                from google.genai import types
+                config = types.GenerateContentConfig(
+                    response_modalities=["IMAGE"],
+                    image_config=types.ImageConfig(aspect_ratio="1:1"),
+                )
+            except ImportError as exc:
+                raise ConfigurationError(
+                    "Google Gen AI SDK is required for live image generation"
+                ) from exc
+            response = self.client.models.generate_content(
+                model=brief.model,
+                contents=[prompt],
+                config=config,
+            )
+            parts = getattr(response, "parts", None)
+            if not parts:
+                candidates = getattr(response, "candidates", None) or []
+                parts = getattr(getattr(candidates[0], "content", None), "parts", []) if candidates else []
+            image_parts = [
+                getattr(part, "inline_data", None) for part in (parts or [])
+                if getattr(part, "inline_data", None) is not None
+            ]
+            payload = None
+            for image_part in image_parts:
+                mime = str(getattr(image_part, "mime_type", "") or "")
+                if mime.startswith("image/"):
+                    payload = getattr(image_part, "data", None)
+                    break
+        else:
+            raise ConfigurationError("Gemini client does not support image generation")
         if not payload:
             raise ProviderError("Gemini returned no image; no procedural fallback was substituted")
         blob = _decode_payload(payload, 15 * 1024 * 1024)
@@ -242,16 +285,48 @@ class GeminiCreativeStudio:
             + ". Maintain the same single subject, coherent character identity, "
               "excellent anatomical consistency, complete limbs and edges, "
               "isolated pure-white/transparent background with 10% padding, "
-              "no captions, no watermarks. Style: " + brief.style
+              "no captions, no watermarks, and no AI-drawn puzzle cuts, "
+              "holes or detached face features. Style: " + brief.style
         )
-        response = self.client.interactions.create(
-            model=brief.model,
-            input=[
-                {"type": "text", "text": prompt},
-                {"type": "image", "data": base64.b64encode(source).decode("ascii"), "mime_type": "image/png"},
-            ],
-        )
-        encoded = getattr(getattr(response, "output_image", None), "data", None)
+        if hasattr(self.client, "interactions") and hasattr(self.client.interactions, "create"):
+            response = self.client.interactions.create(
+                model=brief.model,
+                input=[
+                    {"type": "text", "text": prompt},
+                    {"type": "image", "data": base64.b64encode(source).decode("ascii"), "mime_type": "image/png"},
+                ],
+                response_format={"type": "image", "aspect_ratio": "1:1", "image_size": "1K"},
+            )
+            encoded = getattr(getattr(response, "output_image", None), "data", None)
+        elif hasattr(self.client, "models") and hasattr(self.client.models, "generate_content"):
+            try:
+                from google.genai import types
+                config = types.GenerateContentConfig(
+                    response_modalities=["IMAGE"],
+                    image_config=types.ImageConfig(aspect_ratio="1:1"),
+                )
+                reference_part = types.Part.from_bytes(
+                    data=source, mime_type="image/png"
+                )
+            except ImportError as exc:
+                raise ConfigurationError("Install Google GenAI SDK for image editing") from exc
+            response = self.client.models.generate_content(
+                model=brief.model,
+                contents=[prompt, reference_part],
+                config=config,
+            )
+            parts = getattr(response, "parts", None)
+            if not parts:
+                candidates = getattr(response, "candidates", None) or []
+                parts = getattr(getattr(candidates[0], "content", None), "parts", []) if candidates else []
+            encoded = None
+            for part in parts or []:
+                inline = getattr(part, "inline_data", None)
+                if inline and str(getattr(inline, "mime_type", "")).startswith("image/"):
+                    encoded = getattr(inline, "data", None)
+                    break
+        else:
+            raise ConfigurationError("Gemini client does not support reference-image editing")
         if not encoded:
             raise ProviderError("Gemini returned no edited image")
         blob = _decode_payload(encoded, 15 * 1024 * 1024)

@@ -15,6 +15,66 @@ Offline procedural video generation for original, 9:16 visual-puzzle Reels. This
 
 See [production audit](docs/PRODUCTION_AUDIT.md) for risks and remaining milestones.
 
+## Produce a real-image puzzle Reel (no Gemini credits)
+
+**This is the fully implemented single-operator production workflow.** Start
+from an approved full-resolution original or curated fallback image, extract
+the moving puzzle piece from its **exact source pixels**, and render an
+H.264/AAC 1080x1920 Reel with continuous motion and multiple exact
+one-frame crossings. Review MP4 and QA; export manually to social platforms.
+
+### Quick start — local PC
+
+```bash
+python -m venv .venv
+# Linux: source .venv/bin/activate
+# Windows PowerShell: .venv\\Scripts\\Activate.ps1
+pip install -r requirements-ai.txt
+python -m scripts.bootstrap_factory
+# Set a strong RFACTORY_API_TOKEN in your shell or .env file.
+uvicorn services.api.server:app --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000/studio`. Enter the backend token, install the
+**Rfactory_Asset_Library_v1.zip** artwork pack from this project's shared
+download, select Animals, review/approve the original HD snow leopard, tick
+the media-rights confirmation, and choose
+**Render approved artwork into a Reel**. Select your motion style, shape,
+duration and match count. The page returns a playable MP4 and download link
+**without using Gemini**.
+
+### Quick start — Docker
+
+```bash
+# Set RFACTORY_API_TOKEN to a long random secret before starting services.
+docker compose up --build -d
+```
+
+Compose now starts both the API and a persistent local SQLite render worker.
+The database, artwork and rendered videos share the named `rfactory_data`
+volume. The backend remains bound to `127.0.0.1:8000`.
+
+### CLI mode
+
+```bash
+python -m scripts.import_asset_pack /path/to/Rfactory_Asset_Library_v1.zip
+# Choose the generated 32-character ID from the library's reviewed record.
+# After approving the asset through Studio:
+python -m scripts.render_from_library --asset-id YOUR_APPROVED_ID \\
+    --geometry organic --motion orbit_lock --duration 12 --crossings 5
+```
+
+Explicit `--allow-fallback` is required for pre-existing fallback artwork.
+Small reference-only catalog crops can **never** be approved as final artwork.
+
+No Facebook Page is published to automatically. No unverified model is
+presented as live Gemini image generation. The React/Android and supervised
+browser-publishing milestones remain separate from this finished offline
+single-operator production loop.
+
+See `docs/REAL_IMAGE_RELEASE.md` for release QA and `docs/AI_ASSET_LIBRARY.md`
+for artwork provenance, imports, fallback rules and Gemini limitations.
+
 ## Requirements
 
 - Python 3.11+
@@ -114,3 +174,36 @@ Open `/studio` and paste the backend token. Begin with a creative brief, generat
 
 See [AI Studio documentation and Android plan](docs/AI_STUDIO_AND_ANDROID_PLAN.md). The API at `/api/v1/ai` intentionally separates Gemini credentials and FFmpeg workers from the frontend; `/openapi.json` can later support Capacitor or native Kotlin/Compose Android clients.
 
+
+## Rfactory 3.0 (development branch, not production)
+
+This branch is being implemented and validated in [PR #2](https://github.com/ridaelalaoui42-sys/Rfactory/pull/2).
+It upgrades the source-accurate engine, **not** Facebook publishing or native Android.
+
+**Motion:** sixteen deterministic continuous profiles; seeded, irregular, single-frame exact-fit crossings with no visible solve cue. Available in the Studio motion selector and through \`GET /api/v1/creative/capabilities\`. Preview the real pose path using \`POST /api/v1/creative/motion/preview\`.
+
+**Geometry:** eight pixel-derived mask geometries with positive/negative reconstruction and canonical artwork hash validation. Select a geometry when rendering a \`MISSING_PIECE_SLIDE\` puzzle. Multi-piece reconstruction validates 2–5 nonoverlapping fragments, but independent multi-piece rendering is still in development.
+
+**Live Gemini model discovery:** use \`GET /api/v1/ai/provider-models\` with the configured backend bearer token after enabling AI. This only lists models visible to the account and **does not prove free-tier quotas** or image/TTS authorization.
+
+**Single-host render daemon:** with the runtime installed and bootstrap completed, start:
+
+\`\`\`bash
+python -m scripts.daemon_worker --poll-seconds 4
+# Or process existing queued jobs once and exit:
+python -m scripts.daemon_worker --once
+\`\`\`
+
+A local exclusive lock prevents duplicate worker processes sharing the same storage directory. This is **not** a multi-host or distributed worker leasing solution.
+
+**Motion/geometry showcase:** six original bundled characters in distinct motion/cutout combinations:
+
+\`\`\`bash
+python -m scripts.render_rfactory3_showcase --duration 3 --count 3
+# Longer examples on a capable PC/VM:
+python -m scripts.render_rfactory3_showcase --duration 12 --count 5
+\`\`\`
+
+The GitHub workflow \`.github/workflows/rfactory3-showcase.yml\` uploads actual MP4s and their QA metadata. Artwork is bundled procedural artwork and audio is disabled in these technical demos: do not describe them as live Gemini outputs.
+
+See \`docs/RFACTORY_3_AUDIT.md\` for the complete implementation status and remaining work.
