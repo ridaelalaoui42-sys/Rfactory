@@ -42,6 +42,7 @@ def render_approved_asset(
     face_bbox_norm: tuple[float,float,float,float] | None = None,
     face_asset_seed: int | None = None,
     face_pack_id: str = "",
+    progress_callback=None,
 ) -> dict:
     library=AssetLibrary(storage_root)
     asset=library.get(asset_id)
@@ -79,7 +80,7 @@ def render_approved_asset(
         enable_audio=enable_sfx, sound_mode="match_only",
         seed=seed,
     )
-    rendered=renderer.render_video(config)
+    rendered=renderer.render_video(config, progress_callback=progress_callback)
     qa=validate_rendered_video(
         rendered.mp4_path, expected_duration_sec=duration,
         require_audio=enable_sfx,
