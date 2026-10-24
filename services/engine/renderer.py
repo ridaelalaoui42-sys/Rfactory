@@ -445,8 +445,11 @@ class PuzzleVideoRenderer:
             # while sharing the exact same single-frame crossing scheduler.
             # Altering only the seed on a single profile looked repetitive.
             face_motion_palette = (
-                config.motion_profile, "opposed_spin", "figure_eight",
-                "helix", "pendulum",
+                config.motion_profile,
+                *[name for name in (
+                    "opposed_spin", "figure_eight", "helix", "pendulum",
+                    "vortex", "bezier_sweep",
+                ) if name != config.motion_profile],
             )
             selected_piece_profiles = [
                 face_motion_palette[index % len(face_motion_palette)]
