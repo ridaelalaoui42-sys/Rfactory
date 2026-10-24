@@ -261,6 +261,7 @@
       duration_sec: Number(byId("duration").value),
       sfx_enabled: byId("sfx-enabled").checked,
       motion_profile: byId("motion-profile").value || null,
+      puzzle_geometry: byId("puzzle-geometry").value,
       motion_intensity: Number(byId("motion-intensity").value),
       snap_count: Number(byId("snap-count").value),
     });
