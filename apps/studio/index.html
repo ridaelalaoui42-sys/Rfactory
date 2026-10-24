@@ -143,7 +143,18 @@
                 </select></div>
               </div>
               <label class="check-row" for="library-sfx"><input type="checkbox" id="library-sfx" checked> Subtle sound at crossings only</label>
-              <button class="btn primary full" id="library-render-btn" disabled>▶ Render approved artwork into a Reel</button>
+              <button class="btn primary full" id="library-render-btn" disabled>▶ Queue Reel render</button>
+              <div class="library-queue-panel">
+                <h3>Production queue <small>persistent worker</small></h3>
+                <p id="library-job-status" class="helper" aria-live="polite">No Reel queued in this Studio session.</p>
+                <progress id="library-job-progress" max="100" value="0" style="width:100%;display:block;min-height:8px;"></progress>
+                <div class="btn-row">
+                  <button class="btn outline" id="library-jobs-refresh">↻ Recent jobs</button>
+                  <button class="btn outline" id="library-job-cancel" disabled>✕ Cancel queued</button>
+                </div>
+                <div id="library-recent-jobs" class="helper" aria-live="polite"></div>
+                <p class="helper">Rendering continues if you close this tab. Jobs and progress survive API restarts; an active FFmpeg render cannot yet be cancelled mid-encode.</p>
+              </div>
               <div id="library-video-result" hidden>
                 <video id="library-video-player" controls playsinline preload="metadata" style="width:100%;border-radius:12px;margin-top:12px;"></video>
                 <a id="library-video-download" class="btn outline full" download="rfactory-reel.mp4">↓ Download finished MP4</a>
