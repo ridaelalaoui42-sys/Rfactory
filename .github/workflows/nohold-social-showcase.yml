@@ -1,0 +1,96 @@
+name: No-hold social puzzle render matrix
+
+on:
+  push:
+    branches: [codex/rfactory-3-4-nohold-social-reels, main]
+    paths:
+      - scripts/social_motion.py
+      - scripts/render_social_reels.py
+      - scripts/social_reels_from_config.py
+      - config/social_reels_preset_2026_10.json
+      - .github/workflows/nohold-social-showcase.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rfactory-social-nohold-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render-social-reels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install Python and FFmpeg
+        run: |
+          pip install -r requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+      - name: Run motion, audiovisual, and preset regression tests
+        run: |
+          python -m unittest tests.test_social_motion tests.test_social_visual_rules tests.test_social_reels_presets -v
+      - name: Install included source-resolution sticker archive
+        run: |
+          python scripts/install_social_assets.py assets/social/rfactory_social_assets_compact_v1.zip --dest public/rfactory-social
+      - name: Render all three social 9:16 puzzle Reels
+        run: |
+          python -m scripts.social_reels_from_config \
+            --settings config/social_reels_preset_2026_10.json \
+            --assets public/rfactory-social \
+            --out storage/renders/social-nohold
+      - name: Verify exported MP4s and exact-fit QA
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          root=Path('storage/renders/social-nohold')
+          qa_files=sorted(root.glob('*_qa.json'))
+          assert len(qa_files)==3, f'Expected 3 QA results, got {qa_files}'
+          for path in qa_files:
+              info=json.loads(path.read_text())
+              motion=info['repeated_alignment']
+              video=root/(info['name']+'.mp4')
+              assert video.is_file() and video.stat().st_size > 10000
+              assert motion['fit_count']==5
+              assert len(motion['fit_frames'])==5
+              assert motion['hold_frames']==0
+              assert motion['exact_fit_frames_per_event']==1
+              assert motion['continuous_motion']
+              assert motion['no_visual_match_indicators']
+              assert not motion['final_frame_solved']
+              assert info['source_reconstruction_exact']
+              assert not info['visible_match_indicator']
+              assert not info['final_solved_hold']
+              gaps=motion['irregular_intervals_frames']
+              assert len(set(gaps))>1, gaps
+              ffprobe=json.loads(subprocess.check_output([
+                  'ffprobe','-v','error','-select_streams','v:0',
+                  '-show_entries','stream=codec_name,nb_frames,width,height,r_frame_rate',
+                  '-of','json',str(video)],text=True))
+              stream=ffprobe['streams'][0]
+              assert stream['codec_name']=='h264',stream
+              assert (stream['width'],stream['height'])==(1080,1920),stream
+              assert stream['r_frame_rate']=='24/1',stream
+              assert int(stream['nb_frames'])==int(info['settings']['duration']*24)
+              print('PASS',info['name'], 'fits:', motion['fit_times_seconds'],
+                    'resolution:',stream['width'],stream['height'])
+          PY
+      - name: Upload three playable videos and frame-QA manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: rfactory-3-4-social-continuous-reels
+          path: |
+            storage/renders/social-nohold/*.mp4
+            storage/renders/social-nohold/*_qa.json
+            storage/renders/social-nohold/*_poster.jpg
+            storage/renders/social-nohold/render_report.json
+          if-no-files-found: error
+          retention-days: 14
