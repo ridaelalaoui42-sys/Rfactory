@@ -21,7 +21,6 @@ import tempfile
 import wave
 from dataclasses import dataclass
 import numpy as np
-from scipy.io import wavfile
 
 SR = 24000
 SPEECH = {
@@ -55,6 +54,22 @@ def shell(cmd, *, capture=True):
     return subprocess.run(cmd, check=True, capture_output=capture, text=not capture)
 
 
+def pcm_read(path):
+    """Read mono 16-bit PCM WAV without optional SciPy dependencies."""
+    with wave.open(str(path), 'rb') as f:
+        if f.getnchannels()!=1 or f.getsampwidth()!=2 or f.getcomptype()!='NONE':
+            raise ValueError(f'Expected mono 16-bit PCM WAV: {path}')
+        rate=f.getframerate()
+        data=np.frombuffer(f.readframes(f.getnframes()),dtype='<i2').copy()
+    return rate,data
+
+
+def pcm_write(path, rate, data):
+    v=np.asarray(data,dtype=np.int16)
+    with wave.open(str(path),'wb') as f:
+        f.setnchannels(1);f.setsampwidth(2);f.setframerate(int(rate))
+        f.writeframes(v.astype('<i2',copy=False).tobytes())
+
 def wav_seconds(path):
     with wave.open(str(path),'rb') as w:
         return w.getnframes()/w.getframerate()
@@ -71,7 +86,7 @@ def decoded_voice(path:Path):
         shell(['ffmpeg','-loglevel','error','-y','-i',str(path),'-ar',str(SR),'-ac','1',
                '-af','highpass=f=85,lowpass=f=10200,acompressor=threshold=-22dB:ratio=2.0:attack=12:release=140',
                '-c:a','pcm_s16le',str(intermediate)])
-        fs,raw=wavfile.read(intermediate)
+        fs,raw=pcm_read(intermediate)
     assert fs==SR
     x=raw.astype(np.float32)/32768.
     if x.size<SR//5 or not np.all(np.isfinite(x)):
@@ -119,10 +134,10 @@ def fit_clip(x, available_s, *, minimum_speed=.82, maximum_speed=1.28):
     # Mono phase-vocoder time compression via ffmpeg rubberband? Use atempo at native quality.
     with tempfile.TemporaryDirectory() as td:
         a=Path(td)/'in.wav';b=Path(td)/'out.wav'
-        wavfile.write(a,SR,(np.clip(x,-1,1)*32767).astype(np.int16))
+        pcm_write(a,SR,(np.clip(x,-1,1)*32767).astype(np.int16))
         shell(['ffmpeg','-hide_banner','-loglevel','error','-y','-i',str(a),'-af',f'atempo={ratio:.5f}',
                '-ac','1','-ar',str(SR),'-c:a','pcm_s16le',str(b)])
-        fs, raw=wavfile.read(b)
+        fs, raw=pcm_read(b)
         assert fs==SR
         result=raw.astype(np.float32)/32768.
         return result[:allowed]
@@ -227,7 +242,7 @@ def create_one(stem, cfg, input_dir, output_dir, provider, *, voice_dir=None, mo
         pieces.append(decoded_voice(path))
     music,segments=mix(cfg,pieces,qa['exactFitTimes'])
     backing=output_dir/f'{stem}_{provider}_mix.wav'
-    wavfile.write(backing,SR,(music*32767).astype(np.int16))
+    pcm_write(backing,SR,(music*32767).astype(np.int16))
     final=output_dir/f'{stem}_{provider}.mp4'
     shell(['ffmpeg','-hide_banner','-loglevel','error','-y','-i',str(original),'-i',str(backing),
             '-map','0:v:0','-map','1:a:0','-c:v','copy','-c:a','aac','-b:a','160k',
