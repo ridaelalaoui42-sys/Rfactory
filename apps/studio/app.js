@@ -65,6 +65,88 @@
     if (!response.ok) throw Error(result.detail || "Asset library request failed");
     return result;
   }
+  const facePicker = {
+    image:null, selected:null, dragStart:null,
+    inset:{x:0,y:0,w:420,h:360},
+  };
+  function drawFacePicker() {
+    const canvas=byId("face-roi-canvas");
+    const ctx=canvas.getContext("2d");
+    ctx.fillStyle="#17253c";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    if (!facePicker.image) return;
+    const im=facePicker.image;
+    const scale=Math.min(canvas.width/im.naturalWidth,canvas.height/im.naturalHeight);
+    const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
+    const x=(canvas.width-w)/2,y=(canvas.height-h)/2;
+    facePicker.inset={x,y,w,h};
+    ctx.drawImage(im,x,y,w,h);
+    if (facePicker.selected) {
+      const b=facePicker.selected;
+      ctx.lineWidth=3;ctx.strokeStyle="#47f0cf";
+      ctx.fillStyle="rgba(27,185,153,.15)";
+      ctx.fillRect(x+b.x*w,y+b.y*h,b.w*w,b.h*h);
+      ctx.strokeRect(x+b.x*w,y+b.y*h,b.w*w,b.h*h);
+    }
+  }
+  function facePoint(event) {
+    const canvas=byId("face-roi-canvas");
+    const rect=canvas.getBoundingClientRect();
+    const px=(event.clientX-rect.left)*canvas.width/rect.width;
+    const py=(event.clientY-rect.top)*canvas.height/rect.height;
+    const b=facePicker.inset;
+    return {
+      x:Math.max(0,Math.min(1,(px-b.x)/b.w)),
+      y:Math.max(0,Math.min(1,(py-b.y)/b.h)),
+    };
+  }
+  byId("face-roi-canvas").addEventListener("pointerdown",event=>{
+    if (!facePicker.image)return;
+    facePicker.dragStart=facePoint(event);
+    byId("face-roi-canvas").setPointerCapture(event.pointerId);
+  });
+  byId("face-roi-canvas").addEventListener("pointermove",event=>{
+    if (!facePicker.dragStart || !facePicker.image)return;
+    const end=facePoint(event),start=facePicker.dragStart;
+    facePicker.selected={
+      x:Math.min(start.x,end.x),y:Math.min(start.y,end.y),
+      w:Math.abs(end.x-start.x),h:Math.abs(end.y-start.y),
+    };
+    drawFacePicker();
+  });
+  byId("face-roi-canvas").addEventListener("pointerup",event=>{
+    if (!facePicker.dragStart)return;
+    facePicker.dragStart=null;
+    const b=facePicker.selected;
+    if (!b || b.w<.04 || b.h<.04) {
+      byId("face-roi-status").textContent="Drag a larger rectangle over the face.";
+      return;
+    }
+    byId("face-manual-bbox").value=[b.x,b.y,b.w,b.h].map(v=>v.toFixed(4)).join(", ");
+    byId("face-roi-status").textContent=
+      "Reviewed region selected: "+byId("face-manual-bbox").value+
+      ". This controls which original source pixels are cut out.";
+    drawFacePicker();
+  });
+  async function loadFaceSourcePreview(item) {
+    facePicker.image=null;
+    facePicker.selected=null;
+    drawFacePicker();
+    byId("face-manual-bbox").value="";
+    byId("face-roi-status").textContent="Loading full-resolution original...";
+    const blob=await protectedMedia(item.media_url);
+    // No token in URL. The blob is fetched using authenticated headers.
+    const im=new Image();
+    im.onload=()=>{
+      if (!state.selectedLibrary || state.selectedLibrary.id!==item.id)return;
+      facePicker.image=im;
+      byId("face-roi-status").textContent=
+        "Drag over the face (eyes + muzzle, or full human face), then generate exact masks.";
+      drawFacePicker();
+    };
+    im.onerror=()=>{byId("face-roi-status").textContent="Could not decode preview; enter face box manually."};
+    im.src=blob;
+  }
   function refreshLibraryControls() {
     const asset = state.selectedLibrary;
     byId("library-approve-btn").disabled =
@@ -116,6 +198,8 @@
         state.selectedLibrary = item;
         state.selectedFaceCutout = null;
         byId("face-cutout-results").hidden = true;
+        loadFaceSourcePreview(item).catch(error=>
+          message("Face source preview: "+error.message, "error"));
         grid.querySelectorAll(".library-tile").forEach(el => el.classList.remove("selected"));
         card.classList.add("selected");
         byId("library-selection").textContent =
