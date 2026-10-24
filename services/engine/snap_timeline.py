@@ -130,7 +130,10 @@ class CrossingTimeline:
         cross = part.first_locked_frame
         if frame <= cross:
             return 0.5 * (frame - part.start_frame) / max(1, cross - part.start_frame)
-        return 0.5 + 0.5 * (frame - cross) / max(1, part.end_frame - 1 - cross)
+        # Sample just BEFORE phase 1 at the last frame. The next pass begins
+        # at phase 0, so the moving sprite never repeats the identical end
+        # and start pose on consecutive encoded frames (no boundary freeze).
+        return 0.5 + 0.5 * (frame - cross) / max(1, part.end_frame - cross)
 
     def is_locked(self, frame: int) -> bool:
         return frame == self._pass_for(frame).first_locked_frame
