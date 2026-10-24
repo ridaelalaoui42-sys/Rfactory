@@ -110,6 +110,33 @@ class BoundedFrameCache(OrderedDict):
             self.popitem(last=False)
 
 
+def contain_original_rgba(
+    original: np.ndarray, target_wh: tuple[int,int],
+    bbox_norm: tuple[float,float,float,float] | None = None,
+) -> tuple[np.ndarray,tuple[float,float,float,float] | None]:
+    """Letterbox original intact art without stretching animal/human faces."""
+    target_w,target_h=target_wh
+    original_h,original_w=original.shape[:2]
+    ratio=min(target_w/original_w,target_h/original_h)
+    scaled_w=max(1,round(original_w*ratio))
+    scaled_h=max(1,round(original_h*ratio))
+    scaled=cv2.resize(original,(scaled_w,scaled_h),interpolation=cv2.INTER_LANCZOS4)
+    canvas=np.zeros((target_h,target_w,4),dtype=np.uint8)
+    offset_x=(target_w-scaled_w)//2
+    offset_y=(target_h-scaled_h)//2
+    canvas[offset_y:offset_y+scaled_h,offset_x:offset_x+scaled_w]=scaled
+    mapped=None
+    if bbox_norm is not None:
+        x,y,w,h=bbox_norm
+        mapped=(
+            (offset_x+x*scaled_w)/target_w,
+            (offset_y+y*scaled_h)/target_h,
+            w*scaled_w/target_w,
+            h*scaled_h/target_h,
+        )
+    return canvas,mapped
+
+
 def hex_to_rgb(hex_str: str) -> Tuple[int, int, int]:
     h = hex_str.lstrip("#")
     if len(h) != 6:
@@ -374,11 +401,12 @@ class PuzzleVideoRenderer:
             # One approved, clean source image drives the plate, positive pieces
             # and the exact solved state. Never use an AI-drawn cutout collage.
             face_w, face_h = 860, 860
-            source_rgba = cv2.resize(raw_animal_rgba, (face_w, face_h),
-                                     interpolation=cv2.INTER_LANCZOS4)
+            source_rgba,normalized_face_box = contain_original_rgba(
+                raw_animal_rgba,(face_w,face_h),config.face_bbox_norm
+            )
             face_bundle = face_cutout(
                 source_rgba, config.face_mode, subject_type=config.subject_type,
-                seed=config.seed, face_bbox_norm=config.face_bbox_norm,
+                seed=config.seed, face_bbox_norm=normalized_face_box,
             )
             face_qa = validate_face_bundle(face_bundle)
             pixel_match_mad = face_qa["exact_raw_rgba_mad"]
