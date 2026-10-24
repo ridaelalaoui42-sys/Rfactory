@@ -124,3 +124,26 @@ master prompt until they are genuinely implemented and tested.
 6. No user or third-party credentials or unlicensed assets added to Git.
 7. Screenshots/video artifact reviews before any deployment.
 8. Only merge after the complete set of required checks passes.
+
+## Additional modules delivered
+
+- \`services/ai/provider_catalog.py\` queries the official Google Gen AI SDK
+  \`client.models.list()\` API on demand. New protected
+  \`GET /api/v1/ai/provider-models\` endpoint. It never reports inferred paid
+  access or free-tier entitlements. Unit tests use a fake model list.
+- \`scripts/daemon_worker.py\` is a continuous local render queue consumer
+  with a single-instance advisory file lock and graceful SIGTERM handling.
+  It runs separately from FastAPI, but this is not multi-host leasing or
+  a fully asynchronous user-account processing system.
+- \`scripts/render_rfactory3_showcase.py\` produces six **real 1080x1920**
+  playable MP4 demos, each using a different bundled character, profile
+  and canonical-source mask. The GitHub Actions workflow generates ZIP artifacts.
+  Smoke-video durations are 3 seconds, not final 12–15-second deliverables.
+
+### Verified GitHub Actions artifact
+
+Run [40047756181](https://github.com/ridaelalaoui42-sys/Rfactory/actions/runs/40047756181)
+succeeded and uploaded artifact \`rfactory3-six-video-showcase\` (6 actual MP4s,
+13 MB archive). The six demonstrations verify 3 exact-fit crossings each and
+frame-QA completeness. That is separate from full Python CI, which must pass
+on the final PR head before the branch is considered mergeable.
