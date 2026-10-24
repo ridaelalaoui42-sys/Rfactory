@@ -7,6 +7,8 @@ All FFmpeg and QA work happens in the separate persistent worker process.
 from __future__ import annotations
 
 import json
+import hashlib
+from PIL import Image
 from pathlib import Path
 import re
 
@@ -36,7 +38,17 @@ def validated_spec(request:OfflineRenderRequest,library:AssetLibrary)->dict:
         raise HTTPException(status_code=409,detail="Approve HD source artwork first")
     if asset["is_fallback"] and not request.allow_fallback:
         raise HTTPException(status_code=409,detail="Fallback requires explicit approval")
+    # Pin the exact decoded source pixel hash at submission. If source
+    # artwork changes before the worker picks up the job, the job fails closed.
+    try:
+        with Image.open(library.path(request.asset_id)) as photo:
+            source_pixel_sha256=hashlib.sha256(photo.convert("RGBA").tobytes()).hexdigest()
+    except (OSError,ValueError) as exc:
+        raise HTTPException(status_code=409,detail="Unable to verify original artwork pixels") from exc
+    if source_pixel_sha256 != asset.get("pixel_sha256"):
+        raise HTTPException(status_code=409,detail="Original source changed after approval")
     props={
+        "expected_source_pixel_sha256": source_pixel_sha256,
         "asset_id":request.asset_id,
         "allow_fallback":request.allow_fallback,
         "geometry":request.geometry,
