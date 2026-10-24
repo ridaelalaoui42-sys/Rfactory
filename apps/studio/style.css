@@ -29,3 +29,18 @@ background-color:#29344a;background-image:linear-gradient(45deg,#2d3a55 25%,tran
 .face-roi-picker{margin:11px 0 16px;}
 #face-roi-canvas{display:block;box-sizing:border-box;max-width:100%;width:100%;height:auto;touch-action:none;border:1px solid #375578;border-radius:11px;cursor:crosshair;background:#101b33;}
 #face-roi-status{font-size:.73rem;overflow-wrap:anywhere;}
+
+/* Rfactory campaign factory — compact premium production workspace. */
+.campaign-studio{margin:19px 0 24px;padding:18px;background:linear-gradient(140deg,#0c1930,#142641);border:1px solid #45638f;border-radius:16px;}
+.campaign-studio h3{font-size:1rem;color:#dceefb;margin:0 0 11px;}
+.campaign-studio h3 small{color:#73e3d2;font-size:.73rem;font-weight:600;}
+.campaign-monitor{margin-top:17px;padding:12px;border-radius:12px;background:#101d33;border:1px solid #354a6c;}
+.campaign-art-tile{min-width:0;display:flex;flex-direction:column;gap:5px;}
+.campaign-art-tile .library-tile{width:100%;flex:1;}
+.campaign-source-check{font-size:.7rem;display:flex;gap:5px;align-items:center;padding:3px 5px;color:#bee8e2;cursor:pointer;}
+.campaign-source-check input{accent-color:#67e4c8;min-width:15px;min-height:15px;}
+.campaign-jobs,.campaign-recent{display:flex;flex-direction:column;gap:6px;margin-top:12px;max-height:350px;overflow:auto;}
+.campaign-jobs .queue-row,.campaign-recent .queue-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px;border-radius:8px;border:1px solid #324662;min-width:0;}
+.campaign-jobs .queue-row span,.campaign-recent .queue-row span{min-width:0;overflow-wrap:anywhere;font-size:.72rem;}
+.campaign-studio progress{accent-color:#70e8d2;}
+@media(max-width:430px){.campaign-studio{padding:11px}.campaign-jobs .queue-row,.campaign-recent .queue-row{flex-direction:column;align-items:stretch;}}
