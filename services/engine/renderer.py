@@ -39,6 +39,8 @@ from services.engine.puzzle_geometry import GEOMETRIES, cut_exact_fragment
 from services.assets.face_cutout_engine import FACE_MODES, face_cutout
 from services.assets.fit_validator import validate_face_bundle
 from services.assets.asset_packager import package_face_bundle
+from services.assets.face_canvas import prepare_face_canvas
+from services.assets.approved_face_pack import load_reviewed_face_pack, CutoutIntegrityError
 
 
 @dataclass
@@ -78,6 +80,8 @@ class RenderConfig:
     subject_type: str = "animal"  # animal, human or portrait
     face_bbox_norm: tuple[float,float,float,float] | None = None
     face_asset_seed: int | None = None  # approved source mask seed; motion seed remains independent
+    approved_face_pack_id: str = ""  # exact previously reviewed and hash-locked cutout PNGs
+    approved_source_sha256: str = ""  # original imported image checksum
 
 
 @dataclass
@@ -402,25 +406,39 @@ class PuzzleVideoRenderer:
             # One approved, clean source image drives the plate, positive pieces
             # and the exact solved state. Never use an AI-drawn cutout collage.
             face_w, face_h = 860, 860
-            source_rgba,normalized_face_box = contain_original_rgba(
-                raw_animal_rgba,(face_w,face_h),config.face_bbox_norm
+            source_rgba,normalized_face_box = prepare_face_canvas(
+                raw_animal_rgba,config.face_bbox_norm,(face_w,face_h)
             )
-            face_bundle = face_cutout(
-                source_rgba, config.face_mode, subject_type=config.subject_type,
-                seed=config.face_asset_seed if config.face_asset_seed is not None else config.seed,
-                face_bbox_norm=normalized_face_box,
-            )
+            if config.approved_face_pack_id:
+                if not config.approved_source_sha256:
+                    raise ValueError("An approved face pack requires its original source hash")
+                face_bundle = load_reviewed_face_pack(
+                    self.assets_root.parent, config.approved_face_pack_id,
+                    expected_canonical_rgba=source_rgba,
+                    expected_original_sha256=config.approved_source_sha256,
+                    require_approved=True,
+                )
+                if face_bundle.mode != config.face_mode or face_bundle.subject_type != config.subject_type:
+                    raise CutoutIntegrityError("The reviewed cutout mode differs from the requested video")
+                # IMPORTANT: render the exact approved plate and piece files,
+                # not a new mask generated from the same parameters.
+            else:
+                face_bundle = face_cutout(
+                    source_rgba, config.face_mode, subject_type=config.subject_type,
+                    seed=config.face_asset_seed if config.face_asset_seed is not None else config.seed,
+                    face_bbox_norm=normalized_face_box,
+                )
+                package_face_bundle(
+                    face_bundle, job_dir/"cutout_assets",
+                    provenance="source:" + str(config.asset_path or config.species),
+                    approved=False,
+                )
             face_qa = validate_face_bundle(face_bundle)
             pixel_match_mad = face_qa["exact_raw_rgba_mad"]
             face_x, face_y = (w-face_w)//2, (h-face_h)//2-40
             alpha_composite_inplace(
                 static_base_rgb, face_bundle.hole_plate_rgba,
                 (face_x,face_y),
-            )
-            package_face_bundle(
-                face_bundle, job_dir/"cutout_assets",
-                provenance="approved_source:" + str(config.asset_path or config.species),
-                approved=False,
             )
             # Multi-piece fragments have independent spatial paths. All
             # fragments cross identity on precisely the same single frame.
@@ -817,6 +835,8 @@ class PuzzleVideoRenderer:
         frame_report.update({
             "motion_profile": config.motion_profile,
             "motion_intensity": config.motion_intensity,
+            "approved_face_pack_id": config.approved_face_pack_id or None,
+            "reviewed_cutout_pixels_used_directly": bool(config.approved_face_pack_id),
             "snap_alignment_mad_uncompressed": pixel_match_mad,
         })
         frame_report_path = mp4_path.with_suffix(".frameqa.json")
