@@ -15,14 +15,15 @@
       "reaction": "badges__wow_badge_yellow",
       "puzzle": "circle",
       "motion": "orbit",
-      "speed": 1.0,
-      "revealAt": 7.32,
+      "speed": 1,
       "headline": "PUPPY POP!",
       "instruction": "MATCH THE FACE!",
       "fitCount": 5,
-      "holdFrames": 5,
+      "holdFrames": 0,
       "firstFit": 1.08,
-      "lastFit": 7.28
+      "lastFit": 7.28,
+      "seed": 84191,
+      "enable_fit_sfx": true
     },
     {
       "name": "02_pizza_party",
@@ -34,13 +35,14 @@
       "puzzle": "wedge",
       "motion": "bounce",
       "speed": 1.35,
-      "revealAt": 8.32,
       "headline": "PIZZA PARTY!",
       "instruction": "FIND THE SLICE!",
       "fitCount": 5,
-      "holdFrames": 5,
+      "holdFrames": 0,
       "firstFit": 1.08,
-      "lastFit": 8.28
+      "lastFit": 8.28,
+      "seed": 84788,
+      "enable_fit_sfx": true
     },
     {
       "name": "03_kitty_mixup",
@@ -52,15 +54,16 @@
       "puzzle": "eye_band",
       "motion": "zigzag",
       "speed": 1.65,
-      "revealAt": 9.32,
       "headline": "KITTY MIX-UP!",
       "instruction": "FIX THE KITTY!",
       "fitCount": 5,
-      "holdFrames": 5,
+      "holdFrames": 0,
       "firstFit": 1.08,
-      "lastFit": 9.28
+      "lastFit": 9.28,
+      "seed": 85385,
+      "enable_fit_sfx": true
     }
   ],
   "assetPackGitHubPath": "assets/social/rfactory_social_assets_compact_v1.zip",
-  "motionVersion": "repeated-exact-fit-v2"
+  "motionVersion": "single-frame-continuous-v3"
 }

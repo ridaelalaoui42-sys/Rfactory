@@ -14,9 +14,11 @@ class SocialReelsPresetTests(unittest.TestCase):
         self.assertEqual(len(reels),3)
         self.assertEqual(len(set(c['name'] for c in reels)),3)
         self.assertEqual({c['puzzle'] for c in reels},{'circle','wedge','eye_band'})
+        self.assertEqual(data['motionVersion'],'single-frame-continuous-v3')
         for c in reels:
             self.assertTrue(4 <= c['duration'] <= 15)
-            self.assertTrue(0 < c['revealAt'] < c['duration'])
+            self.assertEqual(c['holdFrames'],0)
+            self.assertIsInstance(c['seed'],int)
             self.assertIn(c['motion'],{'orbit','bounce','zigzag'})
             self.assertNotIn('{',c['headline'])
             self.assertIn('__',c['subject'])

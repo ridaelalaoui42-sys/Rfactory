@@ -13,7 +13,7 @@ except ImportError:
 
 MAPPING = {'background':'theme','subject':'primary','reaction':'badge',
            'headline':'title','instruction':'subtitle','puzzle':'shape',
-           'motion':'move','revealAt':'reveal_at','fitCount':'fit_count',
+           'motion':'move','fitCount':'fit_count',
            'firstFit':'first_fit','lastFit':'last_fit','holdFrames':'hold_frames'}
 
 def load_settings(path: Path) -> list[dict]:
@@ -31,10 +31,10 @@ def load_settings(path: Path) -> list[dict]:
                 if not value.endswith('_vertical.webp'):
                     raise ValueError('Expected a vertical background WebP filename')
                 value=value.removesuffix('_vertical.webp')
-            if k in cfg or k in ('fit_count','hold_frames','first_fit','last_fit'):
+            if k in cfg or k in ('fit_count','hold_frames','first_fit','last_fit','seed','enable_fit_sfx'):
                 cfg[k]=value
-        if not 5<=cfg['duration']<=15 or not 0<cfg['reveal_at']<cfg['duration']:
-            raise ValueError('Invalid duration/revealAt')
+        if not 5<=cfg['duration']<=15:
+            raise ValueError('Invalid video duration')
         if cfg['shape'] not in {'circle','wedge','eye_band'} or cfg['move'] not in {'orbit','bounce','zigzag'}:
             raise ValueError('Unsupported shape or movement')
         validate_schedule(cfg,renderer.FPS)
