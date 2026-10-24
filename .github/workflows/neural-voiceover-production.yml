@@ -1,0 +1,70 @@
+name: Neural voiceover production (manual / paid)
+
+on:
+  workflow_dispatch:
+    inputs:
+      approve_provider_charges:
+        description: 'I authorize live Gemini neural TTS API use, which may incur charges'
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  neural-narration:
+    if: ${{ inputs.approve_provider_charges == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Refuse to run unless Gemini credentials are configured
+        run: |
+          if [ -z "${GEMINI_API_KEY:-}" ]; then
+            echo "::error::Missing GEMINI_API_KEY GitHub Actions secret. Neural speech was not generated."
+            exit 2
+          fi
+      - name: Install video, narration and Gemini dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg espeak
+          python -m pip install -r requirements-ai.txt
+          python -m pip install scipy
+      - name: Generate unmodified picture/video source for the three Reels
+        run: python -m scripts.render_new_voiceover_reels
+      - name: Generate actual neural voiceovers and remux original video without visual changes
+        run: |
+          python -m scripts.upgrade_social_voiceovers \
+            --provider gemini --allow-paid-tts \
+            --input-dir storage/renders/social_voiceovers \
+            --output-dir storage/renders/social_neural
+      - name: Verify neural provenance and pixel-exact fit metadata
+        run: |
+          python - <<'PY'
+          import glob,json
+          files=glob.glob('storage/renders/social_neural/*_gemini_qa.json')
+          assert len(files)==3, 'Expected 3 real Gemini-produced narrated Reels'
+          for f in files:
+              meta=json.load(open(f))
+              assert meta['provider']=='gemini'
+              assert meta['neural_voice'] is True
+              assert meta['video_preserved'] is True
+              assert len(meta['exactFitFrames'])==5
+              assert meta['new_video_stream_hash']==meta['original_video_stream_hash']
+          print('Three verified Gemini TTS narrated Reels')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rfactory-3-verified-gemini-neural-reels
+          path: |
+            storage/renders/social_neural/*.mp4
+            storage/renders/social_neural/*_qa.json
+            storage/renders/social_neural/*_mix.wav
+          if-no-files-found: error
+          retention-days: 30
