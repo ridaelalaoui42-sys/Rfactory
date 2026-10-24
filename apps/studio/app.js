@@ -515,6 +515,7 @@
       (stats.READY||0)+"/"+info.total+" verified Reels · "+
       (stats.FAILED||0)+" failed · "+(stats.QUEUED||0)+" queued";
     byId("campaign-cancel").disabled=!(stats.QUEUED>0);
+    byId("campaign-export").disabled=!(stats.READY>0);
     const list=byId("campaign-jobs");
     list.replaceChildren();
     for(const [i,job] of (info.jobs||[]).entries()) {
@@ -579,6 +580,20 @@
   byId("campaign-fallbacks").addEventListener("change",updateCampaignSelections);
   handle(byId("campaign-refresh"),"Refreshing campaigns...",async()=>{
     await refreshRecentCampaigns();
+  });
+  handle(byId("campaign-export"),"Packaging verified MP4s...",async()=>{
+    if(!activeCampaignId)throw Error("Open a campaign with verified video results first.");
+    const destination="/api/v1/library/campaigns/"+
+      encodeURIComponent(activeCampaignId)+"/export";
+    const url=await protectedMedia(destination);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=activeCampaignId+"_verified_reels.zip";
+    a.style.display="none";
+    document.body.append(a);
+    a.click();
+    a.remove();
+    message("Verified Reel archive downloaded. No videos were published.","ok");
   });
   handle(byId("campaign-cancel"),"Cancelling queued Reels...",async()=>{
     if(!activeCampaignId)throw Error("Open a campaign first.");
