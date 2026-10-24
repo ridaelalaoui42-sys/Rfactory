@@ -101,10 +101,14 @@ def prepare_assets(root, cfg):
     # ordinary RGBA compositing. A partially drawn ghost under the hole
     # would violate the original-art fit at the solved frame.
     blank=Image.new('RGBA',primary.size,(0,0,0,0))
-    restored=Image.alpha_composite(base_piece,moving_piece)
+    # Normalize hidden RGB underneath zero-alpha pixels before comparing:
+    # the source sticker may carry arbitrary RGB there, but those values are
+    # not part of the composited image. Keep the visible RGBA exact, not an
+    # approximate JPEG/encoded comparison.
+    restored=Image.alpha_composite(blank,Image.alpha_composite(base_piece,moving_piece))
     canonical=Image.alpha_composite(blank,primary)
     if not np.array_equal(np.asarray(restored),np.asarray(canonical)):
-        raise AssertionError('Social puzzle source and extracted piece cannot reconstruct exactly')
+        raise AssertionError('Social puzzle visible RGBA cannot reconstruct the canonical source exactly')
     sidekick=sticker(root,cfg['sidekick'],180)
     badge=sticker(root,cfg['badge'],150)
     bg=Image.open(root/'backgrounds'/f"{cfg['theme']}_vertical.webp").convert('RGBA').resize((W,H),Image.Resampling.LANCZOS)
