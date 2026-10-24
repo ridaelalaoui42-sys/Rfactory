@@ -123,7 +123,7 @@ def composed_static(cfg, parts):
     d.rounded_rectangle((46,350,674,956),radius=45,fill=(255,255,255,215),outline=(65,25,95,255),width=7)
     boxed_text(bg,cfg['title'],170,76,cfg['c1'],stroke_width=6)
     boxed_text(bg,cfg['subtitle'],250,46,cfg['c2'],stroke_width=3)
-    boxed_text(bg,'3  ·  2  ·  1  ·  GO!',1073,37,'#ffffff',stroke_width=2)
+    boxed_text(bg,'MATCH IT!',1073,49,'#ffffff',stroke_width=3)
     # Fixed presenter and fixed image, with cutout hole reserved for actual source pixels.
     paste_at(bg,sidekick,25,800-sidekick.height//4)
     x=(W-primary.width)//2; y=500+(440-primary.height)//2
