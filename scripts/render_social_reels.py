@@ -97,6 +97,14 @@ def prepare_assets(root, cfg):
     part_alpha=Image.fromarray((alpha*mp//255).astype('uint8'),'L')
     base_piece=primary.copy();base_piece.putalpha(base_alpha)
     moving_piece=primary.copy();moving_piece.putalpha(part_alpha)
+    # The plate and piece MUST reconstruct exactly the source under
+    # ordinary RGBA compositing. A partially drawn ghost under the hole
+    # would violate the original-art fit at the solved frame.
+    blank=Image.new('RGBA',primary.size,(0,0,0,0))
+    restored=Image.alpha_composite(base_piece,moving_piece)
+    canonical=Image.alpha_composite(blank,primary)
+    if not np.array_equal(np.asarray(restored),np.asarray(canonical)):
+        raise AssertionError('Social puzzle source and extracted piece cannot reconstruct exactly')
     sidekick=sticker(root,cfg['sidekick'],180)
     badge=sticker(root,cfg['badge'],150)
     bg=Image.open(root/'backgrounds'/f"{cfg['theme']}_vertical.webp").convert('RGBA').resize((W,H),Image.Resampling.LANCZOS)
@@ -115,10 +123,8 @@ def composed_static(cfg, parts):
     # Fixed presenter and fixed image, with cutout hole reserved for actual source pixels.
     paste_at(bg,sidekick,25,800-sidekick.height//4)
     x=(W-primary.width)//2; y=500+(440-primary.height)//2
-    # Fill puzzle hole with a dark translucent impression, then layer real-image mask around.
-    ghost=Image.new('RGBA',primary.size,(0,0,0,0))
-    ghost.putalpha(primary.getchannel('A').point(lambda a:int(a*.17)))
-    paste_at(bg,ghost,x,y)
+    # Keep the source cutout truly empty; do not paint a ghost of the
+    # missing face beneath it, which causes color mismatches on exact fit.
     paste_at(bg,base_piece,x,y)
     return bg,x,y
 
@@ -132,20 +138,12 @@ def frame(cfg, t, parts, static, pos):
     canvas=static.copy();draw=ImageDraw.Draw(canvas)
     dx,dy,pose=motion_xy(cfg,t)
     paste_at(canvas,piece,x+dx,y+dy)
-    # Pulsing neon ring when puzzle aligns, cut from same pixel board.
-    if pose.final:
-        r=145+16*math.sin(t*18)
-        draw.ellipse((360-r,670-r,360+r,670+r),outline=(255,227,55,215),width=9)
-        paste_at(canvas,badge,542,858)
-        boxed_text(canvas,'ALL 5 MATCHES!',1056,51,'#50f579',stroke_width=6)
-    elif pose.fit:
-        # Visible repeated exact-fit event. Integer offset is precisely (0,0).
-        boxed_text(canvas,f'MATCH {pose.fit_number}/{pose.total_fits}!',1056,58,'#63ff9d',stroke_width=5)
-        draw.ellipse((185,490,535,840),outline=(255,233,42,255),width=9)
-    else:
-        # Moving score strip guides without covering subject.
-        draw.rounded_rectangle((116,1138,604,1163),radius=11,fill=(255,255,255,75))
-        draw.rounded_rectangle((116,1138,116+int(488*clamp(t/cfg['duration'])),1163),radius=11,fill=(255,220,39,240))
+    # Never show a solution badge, pulsing ring, MATCH text, or final
+    # reveal; a crossing has the same graphic treatment as every frame.
+    # This non-solution timer progresses regardless of puzzle alignment.
+    draw.rounded_rectangle((116,1138,604,1163),radius=11,fill=(255,255,255,75))
+    draw.rounded_rectangle((116,1138,116+int(488*clamp(t/cfg['duration'])),1163),
+                           radius=11,fill=(255,220,39,240))
     rng=random.Random(552+int(t*3))
     for i in range(cfg['sparkles']):
         xx=(47 + (i*93.7)%630 + 12*math.sin(t*2+i))
@@ -159,20 +157,15 @@ def make_audio(path,duration,reveal, cfg=None):
     sr=22050
     n=int(sr*duration)
     out=np.zeros(n,dtype=np.float32)
-    rng=np.random.default_rng(43)
-    for t in np.arange(0,duration,.5):
-        start=int(t*sr); length=int(.10*sr)
-        if start+length>n:continue
-        tt=np.arange(length,dtype=np.float32)/sr
-        phase=330 if (round(t*2)%2==0) else 495
-        beep=(np.sin(2*np.pi*phase*tt)+.35*np.sin(2*np.pi*phase*2*tt))*np.exp(-30*tt)
-        out[start:start+length]+=beep*.07
-    for t in ([x/FPS for x in validate_schedule(cfg,FPS)['fit_frames']] if cfg else [1.8,3.6,5.4,reveal+.58]):
+    # Optional tiny sound ONLY at exact passing frames; no repetitive
+    # countdown ticks and no audible escalation when the piece solves.
+    cues=[x/FPS for x in validate_schedule(cfg,FPS)['fit_frames']] if cfg and cfg.get('enable_fit_sfx',True) else []
+    for t in cues:
         start=int(t*sr); length=min(int(.18*sr),n-start)
         if length<=0:continue
         tt=np.arange(length,dtype=np.float32)/sr
         chirp=np.sin(2*np.pi*(720*tt+700*tt*tt))*np.exp(-16*tt)
-        out[start:start+length]+=chirp*.17
+        out[start:start+length]+=chirp*.11
     out=np.clip(out,-.8,.8)
     with wave.open(str(path),'wb') as f:
         f.setnchannels(1);f.setsampwidth(2);f.setframerate(sr)
@@ -185,7 +178,8 @@ def produce(root,out,cfg):
     outfile=out/f"{cfg['name']}.mp4"
     silent=out/f"{cfg['name']}.silent.mp4"
     audio=out/f"{cfg['name']}.wav"
-    make_audio(audio,duration,cfg['reveal_at'],cfg)
+    exact_fits=validate_schedule(cfg,FPS)
+    make_audio(audio,duration,cfg.get('reveal_at',0),cfg)
     command=['ffmpeg','-hide_banner','-loglevel','error','-y','-f','rawvideo','-pix_fmt','rgb24',
              '-s',f'{W}x{H}','-r',str(FPS),'-i','pipe:0','-vf','scale=1080:1920:flags=lanczos',
              '-c:v','libx264','-preset','veryfast','-crf','22','-pix_fmt','yuv420p','-movflags','+faststart',str(silent)]
@@ -210,8 +204,14 @@ def produce(root,out,cfg):
                             '-of','json',str(outfile)],capture_output=True,text=True,check=True)
     report=json.loads(ffprobe.stdout)
     report.update({'name':cfg['name'],'sourceSprite':cfg['primary'],'sourceAssetTier':'reference_only',
-                   'repeated_alignment':validate_schedule(cfg,FPS),
-                   'puzzle':'exact same source pixels','settings':cfg})
+                   'repeated_alignment':exact_fits,
+                   'puzzle':'exact same source pixels',
+                   'source_reconstruction_exact':True,
+                   'single_frame_crossings':True,
+                   'visible_match_indicator':False,
+                   'final_solved_hold':False,
+                   'audio_only_at_crossings':bool(cfg.get('enable_fit_sfx',True)),
+                   'settings':cfg})
     (out/f"{cfg['name']}_qa.json").write_text(json.dumps(report,indent=2))
     return report
 
