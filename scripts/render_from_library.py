@@ -40,6 +40,7 @@ def render_approved_asset(
     face_mode: str = "",
     subject_type: str = "animal",
     face_bbox_norm: tuple[float,float,float,float] | None = None,
+    face_asset_seed: int | None = None,
 ) -> dict:
     library=AssetLibrary(storage_root)
     asset=library.get(asset_id)
@@ -68,6 +69,7 @@ def render_approved_asset(
         puzzle_geometry="legacy" if face_mode else geometry,
         face_mode=face_mode, subject_type=subject_type,
         face_bbox_norm=face_bbox_norm,
+        face_asset_seed=face_asset_seed,
         randomize_snap_timing=True, continuous_motion=True,
         enable_audio=enable_sfx, sound_mode="match_only",
         seed=seed,
@@ -98,6 +100,7 @@ def render_approved_asset(
         "face_mode":face_mode or None,
         "subject_type":subject_type,
         "face_bbox_norm":list(face_bbox_norm) if face_bbox_norm else None,
+        "approved_face_asset_seed": face_asset_seed,
         "motion_profile":motion,
         "continuous_motion":True,
         "exact_fit_frames":rendered.alignment_frames,
