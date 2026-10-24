@@ -15,6 +15,66 @@ Offline procedural video generation for original, 9:16 visual-puzzle Reels. This
 
 See [production audit](docs/PRODUCTION_AUDIT.md) for risks and remaining milestones.
 
+## Produce a real-image puzzle Reel (no Gemini credits)
+
+**This is the fully implemented single-operator production workflow.** Start
+from an approved full-resolution original or curated fallback image, extract
+the moving puzzle piece from its **exact source pixels**, and render an
+H.264/AAC 1080x1920 Reel with continuous motion and multiple exact
+one-frame crossings. Review MP4 and QA; export manually to social platforms.
+
+### Quick start — local PC
+
+```bash
+python -m venv .venv
+# Linux: source .venv/bin/activate
+# Windows PowerShell: .venv\\Scripts\\Activate.ps1
+pip install -r requirements-ai.txt
+python -m scripts.bootstrap_factory
+# Set a strong RFACTORY_API_TOKEN in your shell or .env file.
+uvicorn services.api.server:app --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000/studio`. Enter the backend token, install the
+**Rfactory_Asset_Library_v1.zip** artwork pack from this project's shared
+download, select Animals, review/approve the original HD snow leopard, tick
+the media-rights confirmation, and choose
+**Render approved artwork into a Reel**. Select your motion style, shape,
+duration and match count. The page returns a playable MP4 and download link
+**without using Gemini**.
+
+### Quick start — Docker
+
+```bash
+# Set RFACTORY_API_TOKEN to a long random secret before starting services.
+docker compose up --build -d
+```
+
+Compose now starts both the API and a persistent local SQLite render worker.
+The database, artwork and rendered videos share the named `rfactory_data`
+volume. The backend remains bound to `127.0.0.1:8000`.
+
+### CLI mode
+
+```bash
+python -m scripts.import_asset_pack /path/to/Rfactory_Asset_Library_v1.zip
+# Choose the generated 32-character ID from the library's reviewed record.
+# After approving the asset through Studio:
+python -m scripts.render_from_library --asset-id YOUR_APPROVED_ID \\
+    --geometry organic --motion orbit_lock --duration 12 --crossings 5
+```
+
+Explicit `--allow-fallback` is required for pre-existing fallback artwork.
+Small reference-only catalog crops can **never** be approved as final artwork.
+
+No Facebook Page is published to automatically. No unverified model is
+presented as live Gemini image generation. The React/Android and supervised
+browser-publishing milestones remain separate from this finished offline
+single-operator production loop.
+
+See `docs/REAL_IMAGE_RELEASE.md` for release QA and `docs/AI_ASSET_LIBRARY.md`
+for artwork provenance, imports, fallback rules and Gemini limitations.
+
 ## Requirements
 
 - Python 3.11+
