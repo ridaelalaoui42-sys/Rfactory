@@ -161,6 +161,43 @@
                 <p id="library-video-qa" class="helper"></p>
               </div>
             </div>
+            <div class="campaign-studio">
+              <h3>Campaign Factory <small>original HD assets only</small></h3>
+              <p class="helper">Choose up to 8 reviewed artworks from the image tiles above. Rfactory will create a varied 2–24-Reel campaign: different continuous motion paths, cutout shapes, seeds and crossing times.</p>
+              <p id="campaign-selection-status" class="helper" aria-live="polite">No source artworks selected. Tick “Campaign” on the approved HD tiles.</p>
+              <div class="grid-two">
+                <div><label for="campaign-name">Campaign name</label>
+                  <input id="campaign-name" type="text" maxlength="90" value="Original Face Puzzle Collection"></div>
+                <div><label for="campaign-count">Number of Reels</label>
+                  <input id="campaign-count" type="number" min="2" max="24" value="6"></div>
+                <div><label for="campaign-duration">Duration per Reel</label>
+                  <select id="campaign-duration">
+                    <option value="10">10 seconds</option><option value="12" selected>12 seconds</option>
+                    <option value="15">15 seconds</option>
+                  </select></div>
+                <div><label for="campaign-fits">Exact fit crossings per Reel</label>
+                  <select id="campaign-fits"><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option></select></div>
+              </div>
+              <label for="campaign-seed">Campaign seed · change this for a new variation batch</label>
+              <input id="campaign-seed" type="number" min="0" max="2147483646" value="42041">
+              <label class="check-row"><input id="campaign-sfx" type="checkbox" checked> Subtle match-only sound cues</label>
+              <label class="check-row"><input id="campaign-fallbacks" type="checkbox"> Explicitly allow selected, approved fallback assets</label>
+              <label class="check-row"><input id="campaign-rights" type="checkbox"> I confirm I have rights to all selected source artworks</label>
+              <button id="campaign-create" class="btn primary full" disabled>▶ Produce varied Reel campaign</button>
+              <div class="campaign-monitor">
+                <h3>Campaign status</h3>
+                <div id="campaign-active-status" role="status" class="helper">No campaign running.</div>
+                <progress id="campaign-progress" value="0" max="100" style="width:100%;min-height:9px"></progress>
+                <div class="btn-row">
+                  <button id="campaign-refresh" class="btn outline">↻ Recent campaigns</button>
+                  <button id="campaign-cancel" class="btn outline" disabled>✕ Cancel pending Reels</button>
+                  <button id="campaign-export" class="btn outline" disabled>↓ Download verified MP4s ZIP</button>
+                </div>
+                <div id="campaign-jobs" class="campaign-jobs" aria-live="polite"></div>
+                <div id="campaign-recent" class="campaign-recent"></div>
+                <p class="helper">Campaigns continue on your PC or VM if you close the tab. Finished files are playable via authenticated video links. Nothing is automatically posted.</p>
+              </div>
+            </div>
             <p class="helper">Fallback never means the Gemini image API succeeded. Nothing is silently substituted or published.</p>
           </div>
           <div class="panel" id="storyboard-panel" hidden>
