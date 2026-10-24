@@ -19,6 +19,7 @@ from scripts.bootstrap_factory import bootstrap
 from services.content.agent import ContentGenerationAgent
 from services.engine.renderer import PuzzleVideoRenderer
 from services.worker.batch_runner import BatchProductionWorker
+from services.worker.art_render_queue import RenderQueue
 
 ROOT=Path(__file__).resolve().parents[1]
 STOP=False
@@ -92,11 +93,22 @@ def main()->int:
         engine=PuzzleVideoRenderer(storage/"assets",storage/"renders")
         worker=BatchProductionWorker(repo,engine,ContentGenerationAgent(),
                                      worker_id=f"local_{os.getpid()}")
+        art_queue=RenderQueue(storage)
+        art_worker_id=f"art_worker_{os.getpid()}"
+        recovered=art_queue.recover_expired()
+        if recovered["requeued"] or recovered["failed"]:
+            print("Recovered interrupted art render jobs: "+str(recovered),flush=True)
         print(f"Rfactory worker PID {os.getpid()} ready. Publishing disabled.",flush=True)
         while not STOP:
             if args.max_jobs and processed>=args.max_jobs:
                 break
             try:
+                art_result=art_queue.process_one(art_worker_id)
+                if art_result is not None:
+                    processed+=1
+                    print("ART "+art_result["id"]+": "+art_result["status"]+
+                          " ("+str(art_result["progress_pct"])+"%)",flush=True)
+                    continue
                 result=worker.process_all_queued_jobs(limit=1)
             except Exception as exc:
                 print(f"Worker queue error: {type(exc).__name__}: {exc}",file=sys.stderr,flush=True)
