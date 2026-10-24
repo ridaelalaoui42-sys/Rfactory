@@ -89,6 +89,20 @@ async def import_asset(
     ))
 
 
+@router.post("/import-pack", status_code=201)
+async def import_generated_artpack(
+    file: UploadFile = File(...),
+    library: AssetLibrary = Depends(get_library),
+):
+    """Install a ZIP asset pack; leave all files unapproved pending review."""
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=415, detail="Provide an Rfactory asset ZIP")
+    contents = await file.read(60 * 1024 * 1024 + 1)
+    if len(contents) > 60 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Asset pack ZIP exceeds 60 MB")
+    return _safe(lambda: library.import_pack(contents))
+
+
 @router.post("/assets/{asset_id}/approve")
 def approve_asset(asset_id: str, library: AssetLibrary = Depends(get_library)):
     return _safe(lambda: library.approve(asset_id))
