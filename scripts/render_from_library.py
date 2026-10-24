@@ -41,6 +41,7 @@ def render_approved_asset(
     subject_type: str = "animal",
     face_bbox_norm: tuple[float,float,float,float] | None = None,
     face_asset_seed: int | None = None,
+    face_pack_id: str = "",
 ) -> dict:
     library=AssetLibrary(storage_root)
     asset=library.get(asset_id)
@@ -50,6 +51,8 @@ def render_approved_asset(
         raise LibraryError("Opt in to explicitly labeled fallback by passing --allow-fallback")
     if face_mode and face_mode not in FACE_MODES:
         raise LibraryError("Unknown face-aware cutout mode")
+    if face_pack_id and not face_mode:
+        raise LibraryError("Reviewed face pack requires a face-aware template")
     if subject_type not in {"animal","human","portrait"}:
         raise LibraryError("Unknown face subject type")
     if geometry not in GEOMETRIES or motion not in MOTION_PROFILES:
@@ -70,6 +73,8 @@ def render_approved_asset(
         face_mode=face_mode, subject_type=subject_type,
         face_bbox_norm=face_bbox_norm,
         face_asset_seed=face_asset_seed,
+        approved_face_pack_id=face_pack_id,
+        approved_source_sha256=asset["sha256"] if face_pack_id else "",
         randomize_snap_timing=True, continuous_motion=True,
         enable_audio=enable_sfx, sound_mode="match_only",
         seed=seed,
@@ -101,6 +106,8 @@ def render_approved_asset(
         "subject_type":subject_type,
         "face_bbox_norm":list(face_bbox_norm) if face_bbox_norm else None,
         "approved_face_asset_seed": face_asset_seed,
+        "reviewed_cutout_pack_id":face_pack_id or None,
+        "used_exact_reviewed_mask_png":bool(face_pack_id),
         "motion_profile":motion,
         "continuous_motion":True,
         "exact_fit_frames":rendered.alignment_frames,
@@ -124,6 +131,8 @@ def main()->int:
     parser.add_argument("--geometry",choices=GEOMETRIES,default="organic")
     parser.add_argument("--motion",choices=MOTION_PROFILES,default="orbit_lock")
     parser.add_argument("--face-mode",choices=FACE_MODES,default=None)
+    parser.add_argument("--approved-face-pack-id",default="",
+                        help="Render the exact previously approved mask and piece PNG files")
     parser.add_argument("--subject-type",choices=["animal","human","portrait"],default="animal")
     parser.add_argument("--face-bbox",nargs=4,type=float,metavar=("X","Y","W","H"),
                         help="Reviewed normalized face bounding box")
@@ -141,6 +150,7 @@ def main()->int:
             enable_sfx=not args.no_sfx,
             face_mode=args.face_mode or "",subject_type=args.subject_type,
             face_bbox_norm=tuple(args.face_bbox) if args.face_bbox else None,
+            face_pack_id=args.approved_face_pack_id,
         )
     except (LibraryError,ValueError,FileNotFoundError,RuntimeError) as exc:
         print(f"FAILED: {exc}",file=sys.stderr)

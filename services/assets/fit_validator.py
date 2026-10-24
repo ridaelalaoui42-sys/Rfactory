@@ -33,6 +33,11 @@ def validate_face_bundle(bundle: FaceAssetBundle) -> dict:
             raise AssertionError("Source-color mismatch in extracted piece")
         if not np.all(part.piece_rgba[part.mask==0]==0):
             raise AssertionError("Nontransparent outside piece mask")
+        # The negative plate must have an ACTUAL transparent hole. Otherwise
+        # an overpainted fake cutout can reconstruct while still displaying
+        # the complete face underneath the moving piece.
+        if not np.all(bundle.hole_plate_rgba[y:y+h,x:x+w][part.mask>0] == 0):
+            raise AssertionError("Hole plate retains pixels inside removed fragment")
         pixels_moved+=int(cv2.countNonZero(part.mask))
         if pixels_moved==0:
             raise AssertionError("Empty face fragment")
