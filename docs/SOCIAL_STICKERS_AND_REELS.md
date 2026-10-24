@@ -14,7 +14,7 @@ This optional package introduces **182 separate alpha-channel sticker cutouts**,
 Obtain Rfactory_Social_Assets_Pack.zip from the delivery conversation; put it in the repository directory. The ZIP is not a public URL and is not automatically downloadable from GitHub Actions.
 
     python scripts/install_social_assets.py ./Rfactory_Social_Assets_Pack.zip --dest public/rfactory-social
-    python scripts/render_social_reels.py --assets public/rfactory-social --out storage/renders/social
+    python -m scripts.social_reels_from_config --settings config/social_reels_preset_2026_10.json --assets public/rfactory-social --out storage/renders/social
 
 You need Python 3.11+, Pillow, NumPy, FFmpeg and FFprobe on PATH. The renderer produces 1080×1920, 24 FPS, H.264/AAC MP4s, posters and JSON QA results.
 
@@ -33,3 +33,6 @@ To turn these into true HD puzzle production candidates, generate each animal/ch
 
 ## Preservation and repository size
 The provided ZIP is approximately 70 MB. Keep the ZIP outside Git history, preferably in artifact storage, object storage, or a GitHub Release asset uploaded separately. The installer never overwrites existing branding and does not change the main video pipeline.
+
+## Change settings without editing Python
+Edit `config/social_reels_preset_2026_10.json` (headlines, duration, speed, puzzle shape, motion, reveal time or background), then rerun `python -m scripts.social_reels_from_config` with `--assets` and `--out`. The JSON adapter validates supported shape/motion and reveal bounds before rendering.
