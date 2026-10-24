@@ -31,6 +31,7 @@ from services.api.creative_routes import router as creative_router
 from services.api.library_routes import router as library_router
 from services.api.cutout_routes import router as cutout_router
 from services.api.art_queue_routes import router as art_queue_router
+from services.api.campaign_routes import router as campaign_router
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 STORAGE_ROOT = REPO_ROOT / "storage"
@@ -41,6 +42,7 @@ app.include_router(creative_router)
 app.include_router(library_router)
 app.include_router(cutout_router)
 app.include_router(art_queue_router)
+app.include_router(campaign_router)
 
 # Framework-neutral, mobile-first studio. Future Android clients share this
 # API while the UI can be packaged with Capacitor if desired.
