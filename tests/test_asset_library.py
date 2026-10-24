@@ -180,6 +180,29 @@ class LibraryAPITests(unittest.TestCase):
         self.assertEqual(preview.status_code,200)
         self.assertEqual(preview.headers["content-type"],"image/png")
 
+    def test_approved_fallback_stages_real_png_without_ai_call(self):
+        from services.ai.workflow import StudioStore, StudioWorkflow
+        from services.api.ai_routes import get_workflow
+        studio = StudioWorkflow(StudioStore(Path(self.temp.name) / "studio"))
+        app.dependency_overrides[get_workflow] = lambda: studio
+        source = self.library.add_image(
+            png_bytes(), "Snow leopard mirrored", "animals", "fallback",
+            "openai_generated_derivative", "Derived from a separately generated source image"
+        )
+        self.library.approve(source["id"])
+        response = self.client.post(
+            f"/api/v1/library/assets/{source['id']}/stage",
+            headers=self.auth, json={"acknowledge_source_license": True},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        staged = response.json()
+        self.assertEqual(staged["status"], "AWAITING_APPROVAL")
+        self.assertEqual(staged["provider"], "curated_asset_library")
+        self.assertEqual(staged["library_provenance"], "openai_generated_derivative")
+        self.assertTrue(staged["fallback_used"])
+        self.assertFalse(staged["generation_attempted"])
+        self.assertTrue(studio.store.media_path("image", staged["id"]).is_file())
+
     def test_zip_pack_endpoint_never_autoapproves_import(self):
         blob=png_bytes()
         bundle=pack_bytes(blob,metadata_for(blob))
