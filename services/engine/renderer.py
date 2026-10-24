@@ -436,6 +436,7 @@ class PuzzleVideoRenderer:
             face_qa = validate_face_bundle(face_bundle)
             pixel_match_mad = face_qa["exact_raw_rgba_mad"]
             face_x, face_y = (w-face_w)//2, (h-face_h)//2-40
+            empty_face_background = static_base_rgb.copy()
             alpha_composite_inplace(
                 static_base_rgb, face_bundle.hole_plate_rgba,
                 (face_x,face_y),
@@ -453,7 +454,7 @@ class PuzzleVideoRenderer:
             ]
             # Capture the actual pixel-composited solved image as a reference
             # BEFORE any independent sprite motion is applied.
-            solved_face_reference = static_base_rgb.copy()
+            solved_face_reference = empty_face_background.copy()
             alpha_composite_inplace(
                 solved_face_reference, face_bundle.source_rgba,
                 (face_x,face_y),
