@@ -53,7 +53,7 @@ class RenderRequest(BaseModel):
     voice_id: str | None = None
     duration_sec: float = Field(default=15.0, ge=8, le=30)
     sfx_enabled: bool = True
-    motion_profile: Literal["slide", "spin_snap", "orbit_lock", "pendulum", "spiral", "elastic", "flip_reveal", "zigzag"] | None = None
+    motion_profile: str | None = Field(default=None, max_length=32, description="One of the supported motion profiles from /api/v1/creative/capabilities")
     motion_intensity: float = Field(default=1.0, ge=0.0, le=2.0)
     snap_count: int = Field(default=0, ge=0, le=12, description="0 uses storyboard cycles; 1-12 chooses number of irregular exact-fit events")
 
