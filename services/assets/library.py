@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 import re
 import secrets
+import zipfile
 from typing import Any
 
 from PIL import Image, UnidentifiedImageError
@@ -95,6 +96,71 @@ class AssetLibrary:
             json.dumps(metadata, sort_keys=True, indent=2), encoding="utf-8"
         )
         return metadata
+
+    def import_pack(self, zip_bytes: bytes, max_items: int = 200) -> dict[str, Any]:
+        """Import a Rfactory asset pack with size/hash/path validation.
+
+        Verify *every* member before writing any library records, so malformed
+        archives cannot leave misleading partially imported asset catalogs.
+        """
+        if not 0 < len(zip_bytes) <= 60 * 1024 * 1024:
+            raise LibraryError("Pack ZIP must be between 1 byte and 60 MB")
+        import_zip = io.BytesIO(zip_bytes)
+        try:
+            with zipfile.ZipFile(import_zip) as archive:
+                manifest_info = archive.getinfo("manifest.json")
+                if manifest_info.file_size > 2 * 1024 * 1024:
+                    raise LibraryError("Asset manifest is too large")
+                manifest = json.loads(archive.read("manifest.json"))
+                records = manifest.get("assets", [])
+                if not isinstance(records, list) or not 1 <= len(records) <= max_items:
+                    raise LibraryError("Asset-pack entry count invalid")
+                files_to_import = []
+                observed = set()
+                size_total = 0
+                for meta in records:
+                    relative = meta.get("file")
+                    if not isinstance(relative, str) or relative.startswith("/") or "\\" in relative:
+                        raise LibraryError("Unsafe pack member name")
+                    fragments = Path(relative).parts
+                    if not fragments or ".." in fragments or relative in observed:
+                        raise LibraryError("Duplicate or unsafe asset path")
+                    observed.add(relative)
+                    info = archive.getinfo(relative)
+                    if info.file_size > MAX_IMAGE_BYTES:
+                        raise LibraryError("Oversized image in asset pack")
+                    size_total += info.file_size
+                    if size_total > 200 * 1024 * 1024:
+                        raise LibraryError("Uncompressed pack exceeds size limit")
+                    payload = archive.read(relative)
+                    if hashlib.sha256(payload).hexdigest() != meta.get("sha256"):
+                        raise LibraryError(f"Pack media checksum mismatch: {relative}")
+                    original_size = meta.get("source_dimensions")
+                    if not (isinstance(original_size, list) and len(original_size) == 2
+                            and all(isinstance(v, int) and v > 0 for v in original_size)):
+                        raise LibraryError(f"Missing original image dimensions: {relative}")
+                    files_to_import.append((meta, payload, tuple(original_size)))
+        except (zipfile.BadZipFile, KeyError, json.JSONDecodeError) as exc:
+            raise LibraryError("Pack has an invalid archive or manifest") from exc
+
+        imported = []
+        for meta, payload, dimensions in files_to_import:
+            imported.append(self.add_image(
+                payload,
+                subject=str(meta["subject"]),
+                category=str(meta["category"]),
+                tier=str(meta["tier"]),
+                provenance=str(meta["provenance"]),
+                source_description=str(meta.get("source_description") or "Imported asset pack"),
+                original_dimensions=dimensions,
+            ))
+        return {
+            "imported": len(imported),
+            "production_candidates": sum(item["production_eligible"] for item in imported),
+            "reference_only": sum(not item["production_eligible"] for item in imported),
+            "fallback_candidates": sum(item["is_fallback"] for item in imported),
+            "assets": imported,
+        }
 
     def get(self, asset_id: str) -> dict[str, Any]:
         if not ID_RE.fullmatch(asset_id):
