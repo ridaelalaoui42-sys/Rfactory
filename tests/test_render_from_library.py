@@ -5,7 +5,16 @@ from pathlib import Path
 
 from services.assets.library import AssetLibrary, LibraryError
 from scripts.render_from_library import render_approved_asset
-from tests.test_asset_library import png_bytes
+from PIL import Image, ImageDraw
+import io
+
+
+def png_bytes():
+    image = Image.new("RGBA", (900, 900), (0, 0, 0, 0))
+    ImageDraw.Draw(image).ellipse((140, 140, 760, 760), fill=(205, 160, 60, 255))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 class OriginalArtworkRenderingTests(unittest.TestCase):
