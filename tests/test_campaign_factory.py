@@ -168,6 +168,49 @@ class CampaignAPITests(unittest.TestCase):
         response=self.client.get("/api/v1/library/campaigns",headers=self.headers)
         self.assertEqual(response.json()["items"],[])
 
+    def test_export_only_verified_mp4s_and_sanitized_manifest(self):
+        import json
+        import zipfile
+        route="/api/v1/library/campaigns"
+        create=self.client.post(route,headers=self.headers,
+                                json={**self.payload(),"count":2})
+        self.assertEqual(create.status_code,202,create.text)
+        campaign_id=create.json()["id"]
+        export=route+"/"+campaign_id+"/export"
+        self.assertEqual(self.client.get(export).status_code,401)
+        self.assertEqual(self.client.get(export,headers=self.headers).status_code,409)
+
+        queue=RenderQueue(self.storage)
+        job_id,_=queue.claim("zip_test_worker")
+        vid="library_1234567890abcd"
+        path=self.storage/"renders"/vid
+        path.mkdir(parents=True)
+        # The archive test checks membership/path sanitation, while the
+        # separate campaign worker integration test checks actual H.264 decode.
+        video_bytes=b"\x00\x00\x00\x18ftypmp42"+b"X"*200
+        (path/(vid+".mp4")).write_bytes(video_bytes)
+        queue.complete(job_id,"zip_test_worker",{
+            "video":str(path/(vid+".mp4")),
+            "exact_fit_times_sec":[0.4,1.3],
+            "all_frames_checked":60,
+            "raw_alignment_mad":0.0,
+            "source_provenance":"test_generated",
+            "explicit_fallback":False,
+        })
+        response=self.client.get(export,headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text[:120])
+        self.assertEqual(response.headers["content-type"],"application/zip")
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            names=archive.namelist()
+            self.assertEqual(len([name for name in names if name.endswith(".mp4")]),1)
+            self.assertIn("manifest.json",names)
+            manifest=json.loads(archive.read("manifest.json"))
+            self.assertEqual(manifest["exported_verified_videos"],1)
+            self.assertEqual(manifest["still_pending_or_failed"],1)
+            self.assertFalse(manifest["published"])
+            self.assertNotIn(str(self.storage),str(manifest))
+            self.assertEqual(archive.read(manifest["videos"][0]["file"]),video_bytes)
+
     def test_one_real_video_job_made_by_campaign_worker(self):
         created=self.client.post("/api/v1/library/campaigns",
             headers=self.headers,json={**self.payload(),"count":2})
