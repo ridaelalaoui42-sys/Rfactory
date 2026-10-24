@@ -11,6 +11,10 @@ from pydantic import BaseModel, Field
 from services.assets.library import AssetLibrary, LibraryError
 from services.ai.workflow import StudioWorkflow
 from services.api.ai_routes import get_workflow
+from services.engine.puzzle_geometry import GEOMETRIES
+from services.engine.motion_profiles import MOTION_PROFILES
+from scripts.render_from_library import render_approved_asset
+import re
 
 ROOT = Path(__file__).resolve().parents[2]
 router = APIRouter(prefix="/api/v1/library", tags=["AI Artwork Library"])
@@ -145,6 +149,88 @@ def stage_asset(
     image["generation_attempted"] = False
     workflow.store.write_metadata("image", image["id"], image)
     return image
+
+
+class OfflineRenderRequest(BaseModel):
+    asset_id: str
+    allow_fallback: bool = False
+    geometry: str = "organic"
+    motion_profile: str = "orbit_lock"
+    duration_sec: float = Field(default=10.0, ge=2, le=30)
+    exact_fit_count: int = Field(default=5, ge=1, le=12)
+    seed: int = Field(default=42041, ge=0, le=2**31 - 1)
+    enable_sfx: bool = True
+
+
+@router.post("/renders", status_code=201)
+def render_curated_artwork(
+    request: OfflineRenderRequest,
+    library: AssetLibrary = Depends(get_library),
+):
+    """Produce a real 9:16 puzzle Reel using approved HD source image.
+
+    Works without Gemini text/image/TTS access. The endpoint is synchronous
+    and is intended for private, single-user local/VM deployments; a durable
+    queue should replace this for high-concurrency multi-user operation.
+    """
+    if request.geometry not in GEOMETRIES or request.motion_profile not in MOTION_PROFILES:
+        raise HTTPException(status_code=422, detail="Unsupported geometry or motion")
+    try:
+        result = render_approved_asset(
+            request.asset_id, storage_root=library.root.parent.parent,
+            allow_fallback=request.allow_fallback,
+            geometry=request.geometry,
+            motion=request.motion_profile,
+            duration=request.duration_sec,
+            crossings=request.exact_fit_count,
+            seed=request.seed,
+            enable_sfx=request.enable_sfx,
+        )
+        # Expose an authenticated opaque video ID, not the VM's local paths.
+        video_id = Path(result["video"]).parent.name
+        if not re.fullmatch(r"library_[a-f0-9]{14}", video_id):
+            raise RuntimeError("Unexpected render ID")
+        return {
+            "id": video_id,
+            "status": "READY_FOR_REVIEW",
+            "video_url": f"/api/v1/library/renders/{video_id}/video",
+            "report_url": f"/api/v1/library/renders/{video_id}/report",
+            "exact_fit_times_sec": result["exact_fit_times_sec"],
+            "decoded_frames_checked": result["all_frames_checked"],
+            "raw_alignment_mad": result["raw_alignment_mad"],
+            "provenance": result["source_provenance"],
+            "fallback_used": result["explicit_fallback"],
+            "published": False,
+        }
+    except (LibraryError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Source image missing") from exc
+
+
+def _validated_render_path(library: AssetLibrary, video_id: str, ext: str) -> Path:
+    if not re.fullmatch(r"library_[a-f0-9]{14}", video_id):
+        raise HTTPException(status_code=404, detail="Unknown render")
+    path = library.root.parent.parent / "renders" / video_id / (video_id + ext)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Render file not found")
+    return path
+
+
+@router.get("/renders/{video_id}/video")
+def curated_video(video_id: str, library: AssetLibrary = Depends(get_library)):
+    path = _validated_render_path(library, video_id, ".mp4")
+    return FileResponse(path, media_type="video/mp4", filename=path.name, content_disposition_type="inline")
+
+
+@router.get("/renders/{video_id}/report")
+def curated_report(video_id: str, library: AssetLibrary = Depends(get_library)):
+    path = _validated_render_path(library, video_id, ".provenance.json")
+    import json
+    record = json.loads(path.read_text(encoding="utf-8"))
+    # Never send server filesystem paths to web and Android clients.
+    record.pop("video", None)
+    return record
 
 
 @router.get("/media/{asset_id}")
