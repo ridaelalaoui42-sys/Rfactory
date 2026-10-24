@@ -3,11 +3,11 @@
 This optional package introduces **182 separate alpha-channel sticker cutouts**, **16 full-size colorful backgrounds** and three preview reels rendered with exact source-pixel puzzle cutouts.
 
 ## Repository changes
-- scripts/install_social_assets.py: secure local unpack from the supplied ZIP.
+- scripts/social_motion.py: repeated fit scheduler (five deterministic zero-offset hits per reel), with duration/configurable hold frames.\n- tests/test_social_motion.py: prevents regressions back to single final alignment.\n- scripts/install_social_assets.py: secure local unpack from the supplied ZIP.
 - scripts/render_social_reels.py: no-cloud Python/Pillow/FFmpeg renderer, exactly matching a moving puzzle part to its stationary source.
 - config/social_reels_preset_2026_10.json: editable preset metadata.
 - tests/test_social_reels_presets.py: smoke validation for presets.
-- **Compact source-resolution pack is now committed in GitHub:** `assets/social/rfactory_social_assets_compact_v1.zip` (3.1 MB; all 182 cutouts and 16 backgrounds). The optional 70 MB full export remains a conversation-only download.ning repository/storage with ~70 MB of generated image derivatives.
+- **Compact source-resolution pack is now committed in GitHub:** `assets/social/rfactory_social_assets_compact_v1.zip` (3.1 MB; all 182 cutouts and 16 backgrounds). The optional 70 MB full export remains a conversation-only download.
 - Regenerated 3 MP4s are provided as ChatGPT downloads, not automatically published.
 
 ## Local installation
