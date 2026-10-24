@@ -5,7 +5,7 @@
   const byId = (id) => document.getElementById(id);
   const state = { token: "", plan: null, image: null, voice: null, render: null,
     selectedLibrary: null, selectedFaceCutout: null, libraryItems: [],
-    campaignAssets:new Map(), urls: [] };
+    campaignAssets:new Map(), approvedFacePacks:new Map(), urls: [] };
   const apiBase = "/api/v1/ai";
 
   function message(text, category = "") {
@@ -391,6 +391,9 @@
       face_bbox_norm:bbox,
       seed:42041,
     });
+    // A new preview invalidates any older approved cutout for this source
+    // in this Studio session until the replacement has been reviewed.
+    state.approvedFacePacks.delete(asset.id);
     state.selectedFaceCutout={...result,approved:false,asset_id:asset.id};
     byId("face-cutout-results").hidden=false;
     byId("face-cutout-status").textContent =
@@ -416,6 +419,8 @@
     const result=await faceRequest("POST",
       "/"+state.selectedFaceCutout.id+"/approve");
     state.selectedFaceCutout.approved=true;
+    state.approvedFacePacks.set(state.selectedFaceCutout.asset_id,
+      state.selectedFaceCutout.id);
     byId("face-approve-btn").disabled=true;
     byId("face-cutout-status").textContent +=
       " · APPROVED for deterministic face-puzzle rendering";
@@ -623,9 +628,10 @@
       allow_fallback:byId("campaign-fallbacks").checked,
       cutout_ids:{},
     };
-    const face=state.selectedFaceCutout;
-    if(face && face.approved && selected.some(item=>item.id===face.asset_id))
-      request.cutout_ids[face.asset_id]=face.id;
+    for(const item of selected) {
+      const faceId=state.approvedFacePacks.get(item.id);
+      if(faceId)request.cutout_ids[item.id]=faceId;
+    }
     // A retry after a lost response must return the ORIGINAL campaign,
     // not create another 24 queued renders. Change the seed intentionally
     // to request a genuinely new batch with different motion timings.
@@ -658,9 +664,7 @@
       duration_sec:Number(byId("library-duration").value),
       exact_fit_count:Number(byId("library-fits").value),
       enable_sfx:byId("library-sfx").checked,
-      cutout_id:state.selectedFaceCutout && state.selectedFaceCutout.approved &&
-        state.selectedFaceCutout.asset_id===art.id ?
-        state.selectedFaceCutout.id:null,
+      cutout_id:state.approvedFacePacks.get(art.id) || null,
       seed:(Date.now() >>> 0)%2147483647,
     };
     const job=await libraryRequest("POST","/render-jobs",request);
