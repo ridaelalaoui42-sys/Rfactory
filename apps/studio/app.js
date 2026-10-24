@@ -4,7 +4,8 @@
   "use strict";
   const byId = (id) => document.getElementById(id);
   const state = { token: "", plan: null, image: null, voice: null, render: null,
-    selectedLibrary: null, selectedFaceCutout: null, libraryItems: [], urls: [] };
+    selectedLibrary: null, selectedFaceCutout: null, libraryItems: [],
+    campaignAssets:new Map(), urls: [] };
   const apiBase = "/api/v1/ai";
 
   function message(text, category = "") {
@@ -147,6 +148,16 @@
     im.onerror=()=>{byId("face-roi-status").textContent="Could not decode preview; enter face box manually."};
     im.src=blob;
   }
+  function updateCampaignSelections() {
+    const selections=[...state.campaignAssets.values()];
+    byId("campaign-selection-status").textContent =
+      selections.length ? selections.length+" approved sources: "+
+        selections.map(item=>item.subject).join(" · ") :
+        "Choose approved HD originals using the Campaign checkboxes on artwork tiles.";
+    byId("campaign-create").disabled =
+      selections.length===0 || !byId("campaign-rights").checked ||
+      (selections.some(item=>item.is_fallback) && !byId("campaign-fallbacks").checked);
+  }
   function refreshLibraryControls() {
     const asset = state.selectedLibrary;
     byId("library-approve-btn").disabled =
@@ -160,6 +171,7 @@
     byId("face-generate-btn").disabled =
       !asset || !asset.production_eligible || !asset.approved ||
       !byId("library-rights").checked || !byId("face-clean-confirm").checked;
+    updateCampaignSelections();
   }
   async function loadArtworkLibrary() {
     const category = byId("library-category").value;
@@ -209,7 +221,33 @@
           (item.production_eligible ? "" : " · not usable in a final Reel");
         refreshLibraryControls();
       });
-      grid.append(card);
+      const group=document.createElement("div");
+      group.className="campaign-art-tile";
+      group.append(card);
+      if(item.approved && item.production_eligible) {
+        const choose=document.createElement("label");
+        choose.className="campaign-source-check";
+        const checkbox=document.createElement("input");
+        checkbox.type="checkbox";
+        checkbox.checked=state.campaignAssets.has(item.id);
+        const caption=document.createElement("span");
+        caption.textContent="Use in campaign";
+        checkbox.addEventListener("change",()=>{
+          if (checkbox.checked && state.campaignAssets.size>=8) {
+            checkbox.checked=false;
+            message("A campaign supports up to eight original HD source images.","error");
+            return;
+          }
+          if(checkbox.checked)state.campaignAssets.set(item.id,{
+            id:item.id,subject:item.subject,is_fallback:Boolean(item.is_fallback)
+          });
+          else state.campaignAssets.delete(item.id);
+          updateCampaignSelections();
+        });
+        choose.append(checkbox,caption);
+        group.append(choose);
+      }
+      grid.append(group);
       // Protected blob URLs: never expose an administrator bearer token in src.
       protectedMedia(item.media_url).then(url => {
         if (card.isConnected) image.src = url;
@@ -467,6 +505,117 @@
     byId("library-job-status").textContent="Queued Reel cancelled";
     await refreshRecentArtJobs();
   });
+  let activeCampaignId=null;
+  function displayCampaign(info) {
+    byId("campaign-progress").value=Number(info.progress_pct||0);
+    const stats=info.counts||{};
+    byId("campaign-active-status").textContent=
+      info.name+" · "+info.status+" · "+info.progress_pct+"% · "+
+      (stats.READY||0)+"/"+info.total+" verified Reels · "+
+      (stats.FAILED||0)+" failed · "+(stats.QUEUED||0)+" queued";
+    byId("campaign-cancel").disabled=!(stats.QUEUED>0);
+    const list=byId("campaign-jobs");
+    list.replaceChildren();
+    for(const [i,job] of (info.jobs||[]).entries()) {
+      const row=document.createElement("div");row.className="queue-row";
+      const description=document.createElement("span");
+      description.textContent="Reel "+(i+1)+" · "+job.status+" · "+job.progress_pct+"%";
+      row.append(description);
+      if(job.status==="READY" && job.result){
+        const watch=document.createElement("button");
+        watch.type="button";watch.className="btn outline";
+        watch.textContent="▶ Watch";
+        watch.addEventListener("click",()=>{
+          showFinishedArtJob(job.result).catch(e=>message(e.message,"error"));
+        });
+        row.append(watch);
+      }
+      list.append(row);
+    }
+  }
+  async function watchCampaign(id) {
+    if(activeCampaignId===id)return;
+    activeCampaignId=id;
+    async function poll() {
+      if(activeCampaignId!==id)return;
+      try {
+        const result=await libraryRequest("GET","/campaigns/"+encodeURIComponent(id));
+        displayCampaign(result);
+        if(["READY","FAILED","PARTIAL","CANCELLED"].includes(result.status)) {
+          activeCampaignId=null;
+          await refreshRecentCampaigns();
+          return;
+        }
+      } catch(err) {
+        byId("campaign-active-status").textContent=
+          "Reconnecting to persisted campaign "+id+" · "+err.message;
+      }
+      if(activeCampaignId===id)setTimeout(poll,2300);
+    }
+    await poll();
+  }
+  async function refreshRecentCampaigns() {
+    const recent=await libraryRequest("GET","/campaigns?limit=6");
+    const node=byId("campaign-recent");node.replaceChildren();
+    for(const info of recent.items||[]) {
+      const row=document.createElement("div");row.className="queue-row";
+      const summary=document.createElement("span");
+      summary.textContent=info.name+" · "+info.status+" · "+
+        (info.counts?.READY||0)+"/"+info.total+" videos";
+      const open=document.createElement("button");
+      open.type="button";open.className="btn outline";open.textContent="Open";
+      open.addEventListener("click",()=>{
+        displayCampaign(info);
+        if(["QUEUED","RUNNING"].includes(info.status))
+          watchCampaign(info.id).catch(e=>message(e.message,"error"));
+        else activeCampaignId=info.id;
+      });
+      row.append(summary,open);
+      node.append(row);
+    }
+  }
+  byId("campaign-rights").addEventListener("change",updateCampaignSelections);
+  byId("campaign-fallbacks").addEventListener("change",updateCampaignSelections);
+  handle(byId("campaign-refresh"),"Refreshing campaigns...",async()=>{
+    await refreshRecentCampaigns();
+  });
+  handle(byId("campaign-cancel"),"Cancelling queued Reels...",async()=>{
+    if(!activeCampaignId)throw Error("Open a campaign first.");
+    const info=await libraryRequest("POST",
+      "/campaigns/"+encodeURIComponent(activeCampaignId)+"/cancel-pending");
+    displayCampaign(info);
+    await refreshRecentCampaigns();
+  });
+  handle(byId("campaign-create"),"Submitting batch production...",async()=>{
+    const selected=[...state.campaignAssets.values()];
+    if(selected.length===0 || !byId("campaign-rights").checked)
+      throw Error("Choose approved original art and confirm usage rights.");
+    if(selected.some(item=>item.is_fallback) &&
+       !byId("campaign-fallbacks").checked)
+      throw Error("Explicitly authorize approved fallback artwork.");
+    const count=Number(byId("campaign-count").value);
+    if(!Number.isInteger(count) || count<2 || count>24)
+      throw Error("Campaign size must be 2–24 Reels.");
+    const request={
+      name:byId("campaign-name").value.trim(),
+      asset_ids:selected.map(item=>item.id),
+      count,
+      base_seed:(Date.now()>>>0)%2147483647,
+      duration_sec:Number(byId("campaign-duration").value),
+      exact_fit_count:Number(byId("campaign-fits").value),
+      enable_sfx:byId("campaign-sfx").checked,
+      allow_fallback:byId("campaign-fallbacks").checked,
+      cutout_ids:{},
+    };
+    const face=state.selectedFaceCutout;
+    if(face && face.approved && selected.some(item=>item.id===face.asset_id))
+      request.cutout_ids[face.asset_id]=face.id;
+    const result=await libraryRequest("POST","/campaigns",request);
+    displayCampaign(result);
+    await refreshRecentCampaigns();
+    watchCampaign(result.id).catch(e=>message(e.message,"error"));
+    message("Campaign created with "+result.total+" unique plans. Your render worker will produce and validate each MP4.","ok");
+  });
   handle(byId("library-render-btn"), "Submitting to render worker...", async () => {
     const art=state.selectedLibrary;
     if (!art || !art.approved || !art.production_eligible ||
@@ -525,6 +674,7 @@
       output("Rendering needs only approved HD artwork and the persistent local worker.");
       await loadArtworkLibrary();
       await refreshRecentArtJobs();
+      await refreshRecentCampaigns();
       return;
     }
     byId("connection-state").textContent = "Connected to Gemini-ready backend";
@@ -534,6 +684,7 @@
     byId("api-token").placeholder = "Token loaded for this session";
     await loadArtworkLibrary();
     await refreshRecentArtJobs();
+    await refreshRecentCampaigns();
   });
   handle(byId("plan-btn"), "Directing with Gemini...", async () => {
     const brief = {
