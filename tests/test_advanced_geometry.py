@@ -46,6 +46,43 @@ class AdvancedGeometryTests(unittest.TestCase):
             restored[y:y+h,x:x+w][frag.mask>0]=frag.piece_rgba[frag.mask>0]
         self.assertTrue(np.array_equal(restored,self.source))
 
+    def test_real_puzzle_renders_curved_canonical_fragment(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from services.engine.renderer import RenderConfig, PuzzleVideoRenderer
+        from services.engine.qa_validator import validate_rendered_video
+
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory(prefix="rfactory_jigsaw_") as temp:
+            renderer = PuzzleVideoRenderer(root/"storage"/"assets", Path(temp))
+            config = RenderConfig(
+                job_id="jigsaw_two_fits",
+                template_id="MISSING_PIECE_SLIDE",
+                species="donkey",
+                seed=93215,
+                duration_sec=2.0,
+                cycles=2,
+                snap_count=2,
+                enable_audio=False,
+                puzzle_geometry="jigsaw",
+                motion_profile="helix",
+                continuous_motion=True,
+            )
+            result=renderer.render_video(config)
+            self.assertEqual(result.pixel_match_mad, 0.0)
+            self.assertEqual(len(result.alignment_frames),2)
+            check = validate_rendered_video(result.mp4_path,
+                expected_duration_sec=2.0,
+                require_audio=False,
+                missing_piece_mad=result.pixel_match_mad,
+            )
+            self.assertTrue(check.passed, check.errors)
+            qa_path=Path(result.mp4_path).with_suffix(".frameqa.json")
+            frame_qa=json.loads(qa_path.read_text())
+            self.assertTrue(frame_qa["passed"])
+            self.assertEqual(frame_qa["frames_checked"],60)
+
     def test_overlapping_targets_fail_closed(self):
         with self.assertRaises(ValueError):
             cut_multiple_fragments(self.source,[
