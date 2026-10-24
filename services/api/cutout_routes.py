@@ -99,7 +99,13 @@ def create_face_cutout(
     metadata.update({
         "id":face_id,"library_asset_id":request.asset_id,
         "seed":request.seed,
-        "face_bbox_norm":list(request.face_bbox_norm) if request.face_bbox_norm else None,
+        "face_bbox_norm":list(request.face_bbox_norm) if request.face_bbox_norm else [
+            round(bundle.face_bbox_xywh[0] / canonical.width, 8),
+            round(bundle.face_bbox_xywh[1] / canonical.height, 8),
+            round(bundle.face_bbox_xywh[2] / canonical.width, 8),
+            round(bundle.face_bbox_xywh[3] / canonical.height, 8),
+        ],
+        "bbox_review_origin": "operator_annotated" if request.face_bbox_norm else "detector_or_estimate_pending_review",
         "clean_source_review":"operator_confirmed_not_computer_vision_proven",
         "download_url":f"/api/v1/assets/{face_id}/download",
     })
