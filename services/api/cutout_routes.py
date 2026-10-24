@@ -19,6 +19,8 @@ from pydantic import BaseModel, Field
 from services.api.library_routes import get_library
 from services.assets.library import AssetLibrary, LibraryError
 from services.assets.canonical_builder import canonicalize_image
+from services.assets.face_canvas import prepare_face_canvas
+from services.assets.approved_face_pack import load_reviewed_face_pack, manifest_and_files, file_hashes, CutoutIntegrityError
 from services.assets.face_cutout_engine import FACE_MODES, face_cutout
 from services.assets.asset_packager import package_face_bundle, create_puzzle_zip
 
@@ -83,10 +85,13 @@ def create_face_cutout(
             clean_source_confirmed=request.clean_source_confirmed,
             minimum_side=768,
         )
-        bundle=face_cutout(canonical.rgba,request.mode,
+        # Cut and review on the SAME aspect-preserving canvas as the
+        # final renderer. Never resize a reviewed cutout again.
+        canvas,mapped_face=prepare_face_canvas(canonical.rgba,request.face_bbox_norm)
+        bundle=face_cutout(canvas,request.mode,
                            subject_type=request.subject_type,
                            seed=request.seed,
-                           face_bbox_norm=request.face_bbox_norm)
+                           face_bbox_norm=mapped_face)
     except (LibraryError,ValueError,FileNotFoundError) as exc:
         raise HTTPException(422,str(exc)) from exc
     face_id="face_"+secrets.token_hex(12)
@@ -100,10 +105,10 @@ def create_face_cutout(
         "id":face_id,"library_asset_id":request.asset_id,
         "seed":request.seed,
         "face_bbox_norm":list(request.face_bbox_norm) if request.face_bbox_norm else [
-            round(bundle.face_bbox_xywh[0] / canonical.width, 8),
-            round(bundle.face_bbox_xywh[1] / canonical.height, 8),
-            round(bundle.face_bbox_xywh[2] / canonical.width, 8),
-            round(bundle.face_bbox_xywh[3] / canonical.height, 8),
+            round(bundle.face_bbox_xywh[0] / canvas.shape[1], 8),
+            round(bundle.face_bbox_xywh[1] / canvas.shape[0], 8),
+            round(bundle.face_bbox_xywh[2] / canvas.shape[1], 8),
+            round(bundle.face_bbox_xywh[3] / canvas.shape[0], 8),
         ],
         "bbox_review_origin": "operator_annotated" if request.face_bbox_norm else "detector_or_estimate_pending_review",
         "clean_source_review":"operator_confirmed_not_computer_vision_proven",
@@ -144,7 +149,30 @@ def approve_face_cutout(face_id: str,library: AssetLibrary=Depends(get_library))
     asset=library.get(data["library_asset_id"])
     if not asset["approved"] or not asset["production_eligible"]:
         raise HTTPException(409,"Source is no longer approved")
-    data.update({"approved":True,"status":"APPROVED"})
+    # Verify the actual PNGs being approved. Manifest QA is insufficient:
+    # an artist may have edited the mask or plate after generation.
+    try:
+        root,_,members=manifest_and_files(library.root.parent.parent,face_id)
+        original=canonicalize_image(
+            library.path(data["library_asset_id"]).read_bytes(),
+            provenance=asset["provenance"],clean_source_confirmed=True,
+            minimum_side=768,
+        )
+        canvas,_=prepare_face_canvas(original.rgba)
+        load_reviewed_face_pack(
+            library.root.parent.parent,face_id,
+            expected_canonical_rgba=canvas,
+            expected_original_sha256=asset["sha256"],
+            require_approved=False,
+        )
+        hashes=file_hashes(root,members)
+    except (CutoutIntegrityError,ValueError,FileNotFoundError) as exc:
+        raise HTTPException(409, "Cutout source, geometry or media validation failed") from exc
+    data.update({
+        "approved":True,"status":"APPROVED",
+        "approved_media_sha256":hashes,
+        "approved_pixel_source_sha256":data["normalized_source_pixel_sha256"],
+    })
     (_pack_path(library,face_id)/"puzzle_manifest.json").write_text(
         json.dumps(data,indent=2),encoding="utf8"
     )
