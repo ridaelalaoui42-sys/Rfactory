@@ -282,14 +282,43 @@ class GeminiCreativeStudio:
               "isolated pure-white/transparent background with 10% padding, "
               "no captions, no watermarks. Style: " + brief.style
         )
-        response = self.client.interactions.create(
-            model=brief.model,
-            input=[
-                {"type": "text", "text": prompt},
-                {"type": "image", "data": base64.b64encode(source).decode("ascii"), "mime_type": "image/png"},
-            ],
-        )
-        encoded = getattr(getattr(response, "output_image", None), "data", None)
+        if hasattr(self.client, "models") and hasattr(self.client.models, "generate_content"):
+            try:
+                from google.genai import types
+                config = types.GenerateContentConfig(
+                    response_modalities=["IMAGE"],
+                    image_config=types.ImageConfig(aspect_ratio="1:1"),
+                )
+                reference_part = types.Part.from_bytes(
+                    data=source, mime_type="image/png"
+                )
+            except ImportError as exc:
+                raise ConfigurationError("Install Google GenAI SDK for image editing") from exc
+            response = self.client.models.generate_content(
+                model=brief.model,
+                contents=[prompt, reference_part],
+                config=config,
+            )
+            parts = getattr(response, "parts", None)
+            if not parts:
+                candidates = getattr(response, "candidates", None) or []
+                parts = getattr(getattr(candidates[0], "content", None), "parts", []) if candidates else []
+            encoded = None
+            for part in parts or []:
+                inline = getattr(part, "inline_data", None)
+                if inline and str(getattr(inline, "mime_type", "")).startswith("image/"):
+                    encoded = getattr(inline, "data", None)
+                    break
+        else:
+            # Compatibility with injected test clients only.
+            response = self.client.interactions.create(
+                model=brief.model,
+                input=[
+                    {"type": "text", "text": prompt},
+                    {"type": "image", "data": base64.b64encode(source).decode("ascii"), "mime_type": "image/png"},
+                ],
+            )
+            encoded = getattr(getattr(response, "output_image", None), "data", None)
         if not encoded:
             raise ProviderError("Gemini returned no edited image")
         blob = _decode_payload(encoded, 15 * 1024 * 1024)
