@@ -7,7 +7,7 @@ from .render import render,media_root
 from .research import youtube_search
 from .editorv1 import status as upstream_status
 
-app=FastAPI(title="ClipForge AI",version="0.1.0")
+app=FastAPI(title="ClipForge AI",version="0.2.0")
 
 def admin(authorization:str|None=Header(default=None)):
     token=os.getenv("CLIPFORGE_API_TOKEN","").strip()
@@ -16,7 +16,7 @@ def admin(authorization:str|None=Header(default=None)):
     if not secrets.compare_digest(token,given):raise HTTPException(401,"Unauthorized")
 
 @app.get("/health")
-def health():return {"status":"ok","service":"clipforge","version":"0.1.0"}
+def health():return {"status":"ok","service":"clipforge","version":"0.2.0"}
 
 @app.get("/v1/formats",dependencies=[Depends(admin)])
 def formats():return {name:{"width":dims[0],"height":dims[1]} for name,dims in FORMATS.items()}

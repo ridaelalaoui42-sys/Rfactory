@@ -47,6 +47,12 @@ To import a transcript using an approved workflow:
 
 Transcript format is a JSON list with start/end seconds and text fields. ytb-cli transcript research is also available through the authenticated API, but it does not authorize downloading or republishing a source video.
 
+## Scheduled topic watches
+
+In the dashboard, search a topic and select "Watch daily" with a market and language. The Docker worker automatically refreshes pending watches using the official YouTube Data API, stores deduplicated video metadata, and enforces a daily query limit. This research catalog never automatically imports third-party footage for publishing.
+
+API endpoints: POST /v1/topics, GET /v1/topics, GET /v1/topic-results, POST /v1/topics/{id}/scan.
+
 ## Render and Editor V1
 
     clipforge create-plan --source-id 1 --ranges "10:35,46:88" --format vertical --output my-short.mp4

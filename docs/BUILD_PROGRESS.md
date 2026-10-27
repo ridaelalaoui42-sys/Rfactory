@@ -2,7 +2,7 @@
 
 ## Implemented, verifiable
 - Responsive single-operator dashboard at root URL, authenticated admin API and local media upload.
-- YouTube Data API video metadata search and optional ytb-cli research for discovery and transcript import.
+- YouTube Data API video metadata search, scheduled topic watches (Morocco/international), deduplication and quota budget; optional ytb-cli research for discovery and transcript import.
 - Rights-labelled sources; evidence required for unattended media rendering.
 - Searchable transcript segments, explainable clip candidate scoring, optional CPU faster-whisper transcription.
 - SQLite durable render/transcribe job queue, atomic claims and Docker worker process.
