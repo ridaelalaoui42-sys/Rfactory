@@ -2,6 +2,7 @@
 import json,os
 from pathlib import Path
 from .core import EditPlan
+from .style_atlas import style_brief
 
 def status():
     raw=os.getenv("CLIPFORGE_EDITOR_V1_PATH","").strip()
@@ -26,5 +27,11 @@ def brief(plan:EditPlan,src:dict,out:Path):
               "Use dynamic documentary editing without obscuring faces",
               "Ensure portrait AND landscape layout-specific typography",
               "Human-review sources and editorial quality before publishing"]}
+    if plan.style_preset:
+        data["visual_style"] = style_brief(plan.style_preset, plan.format)
+        data["directions"].append(
+            "Apply the supplied visual_style directions to the private Editor V1 composition; "
+            "this JSON brief does not mean style animation has already been rendered"
+        )
     out.write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding="utf-8")
     return out
