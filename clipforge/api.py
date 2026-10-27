@@ -204,3 +204,33 @@ def publish_draft(plan_id:int,body:PublicationRequest):
         return {"job_id":jobid,"destination":body.destination,
                 "note":"Destination creates private/draft content only, never public posts"}
     except ValueError as exc:raise HTTPException(400,str(exc))
+
+
+class NewTopicWatch(BaseModel):
+    query: str
+    region: str = "MA"
+    language: str = "ar"
+    interval_hours: int = 24
+
+@app.post("/v1/topics",dependencies=[Depends(admin)])
+def create_topic(body:NewTopicWatch):
+    from . import topics
+    try:return {"id":topics.create(body.query,body.region,body.language,body.interval_hours)}
+    except ValueError as exc:raise HTTPException(400,str(exc))
+
+@app.get("/v1/topics",dependencies=[Depends(admin)])
+def get_topics():
+    from . import topics
+    return topics.watches()
+
+@app.get("/v1/topic-results",dependencies=[Depends(admin)])
+def get_topic_results(topic_id:int|None=None,limit:int=50):
+    from . import topics
+    return topics.results(topic_id,limit)
+
+@app.post("/v1/topics/{topic_id}/scan",dependencies=[Depends(admin)])
+def scan_topic(topic_id:int):
+    from . import topics
+    try:return topics.scan(topic_id)
+    except ValueError as exc:raise HTTPException(400,str(exc))
+    except Exception:raise HTTPException(502,"Topic research failed; check worker logs")
