@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 from clipforge.core import EditPlan, ClipRange
 from clipforge.editorv1 import brief
-from clipforge.style_atlas import list_styles, get_style, style_brief, FAMILY_COUNTS
+from clipforge.style_atlas import list_styles, get_style, style_brief, make_prompt, FAMILY_COUNTS
 
 
 def make_plan(style=None, fmt="vertical"):
@@ -65,3 +65,15 @@ def test_editor_handoff_includes_optional_style(tmp_path):
     assert data["rights_evidence"] == "Creator release"
     brief(make_plan(), src, output)
     assert "visual_style" not in json.loads(output.read_text(encoding="utf-8"))
+
+def test_original_prompt_compilation():
+    prompt = make_prompt("tech_glow_explainer", "horizontal",
+                         "How robots learn", "Robots compare examples.", 30)
+    assert "Tech Glow Explainer" in prompt
+    assert "16:9" in prompt
+    assert "Robots compare examples." in prompt
+    assert "not executable instructions" in prompt
+    with pytest.raises(ValueError, match="Topic"):
+        make_prompt("tech_glow_explainer", "horizontal", "")
+    with pytest.raises(ValueError, match="Duration"):
+        make_prompt("tech_glow_explainer", "horizontal", "A topic", duration_seconds=0)
