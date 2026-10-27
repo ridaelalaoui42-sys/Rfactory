@@ -18,6 +18,7 @@
 - OAuth-based YouTube/Meta publishing; platform verification and credentials required.
 - Per-tenant SaaS security and external media storage.
 - Legal clearance/fair-use approval or unrestricted third-party video downloads.
+- Platform uploader adapters that have been verified against actual connected YouTube/Meta accounts; current implementations are draft/private-only and credential-gated.
 - A continuously running hosted production server; Docker runs on the operator's infrastructure.
 
 ## Running locally

@@ -17,8 +17,16 @@ services:
   worker:
     build: .
     command: ["python","-m","clipforge.worker"]
-    environment: *defaults
-    volumes: *shared
+    environment:
+      <<: *defaults
+      CLIPFORGE_YOUTUBE_OAUTH_JSON: /run/secrets/youtube-oauth.json
+      CLIPFORGE_META_PAGE_TOKEN: ${CLIPFORGE_META_PAGE_TOKEN:-}
+      CLIPFORGE_META_GRAPH_VERSION: ${CLIPFORGE_META_GRAPH_VERSION:-}
+    volumes:
+      - cf_db:/app/data
+      - cf_media:/app/media
+      - cf_output:/app/out
+      - ./secrets:/run/secrets:ro
     restart: unless-stopped
 volumes:
   cf_db:

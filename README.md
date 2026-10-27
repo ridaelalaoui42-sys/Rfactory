@@ -58,7 +58,7 @@ Burning source-aligned captions is available through the dashboard / API. Every 
 
 ## Boundaries
 
-Not delivered yet: fully autonomous original Editor V1 effects, AI B-roll and full scriptwriting, multi-user SaaS, YouTube/Facebook account OAuth and approved publishing, a hosted server, or legal copyright/fair-use clearance. Source rights and platform terms are mandatory.
+Not delivered yet: fully autonomous original Editor V1 effects, AI B-roll and full scriptwriting, multi-user SaaS, OAuth account onboarding and live-tested public publishing, a hosted server, or legal copyright/fair-use clearance. Optional private YouTube and draft Facebook upload adapters are implemented but require your authorized credentials and operator approval. Read docs/PUBLISHING.md. Source rights and platform terms are mandatory.
 
 Original Rfactory code and branding assets remain preserved on branch backup/rfactory-before-clipforge-2026-10-27. Read docs/BUILD_PROGRESS.md for current implementation details.
 
