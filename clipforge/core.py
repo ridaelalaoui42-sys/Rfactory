@@ -1,7 +1,7 @@
 """Schemas and security gates for video production."""
 from pathlib import Path
 from typing import Literal
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 
 FORMATS = {"vertical":(1080,1920),"horizontal":(1920,1080),"square":(1080,1080)}
 APPROVED_RIGHTS = {"owned","licensed","permission","public_domain"}
@@ -39,6 +39,14 @@ class EditPlan(BaseModel):
     output_name: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*\.mp4$")
     title: str = ""
     captions: bool = False
+    style_preset: str | None = None
+    @field_validator("style_preset")
+    @classmethod
+    def known_style(cls, value):
+        if value is not None:
+            from .style_atlas import get_style
+            get_style(value)
+        return value
     @model_validator(mode="after")
     def max_duration(self):
         if sum(r.end-r.start for r in self.ranges)>14400: raise ValueError("Four-hour output limit")
