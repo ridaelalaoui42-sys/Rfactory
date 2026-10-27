@@ -6,7 +6,7 @@ Source of visual inspiration: [Futurepedia AI Style Atlas](https://www.futureped
 
 - `clipforge/style_atlas.py` defines 18 curated, self-authored direction presets. Each has family, best-for, visual language, animation operations, audio-design cue names and typography.
 - `EditPlan.style_preset` is optional. Unsupported IDs fail validation; existing projects are unchanged.
-- `GET /v1/styles` provides the protected catalog; `GET /v1/styles/{style_id}?output_format=vertical` previews a detailed brief.
+- `GET /v1/styles` provides the protected catalog; `GET /v1/styles/{style_id}?output_format=vertical` previews a detailed brief. `POST /v1/styles/prompt` compiles an original source-editable creative prompt from a topic, optional narration, duration and selected style.
 - When a render plan declares a style, its existing `.editor-v1.json` creative brief includes a `visual_style` object with output-specific layout rules, normalized story beats and QA requirements. The default remains unchanged.
 - No upstream Editor V1 files are redistributed or executed; the existing private `CLIPFORGE_EDITOR_V1_PATH` contract remains intact.
 
