@@ -28,7 +28,7 @@ code{color:#8fd1ff}.foot{font-size:12px;margin-top:30px;text-align:center}
 <section class="card"><h2>01 / Topic intelligence</h2><p>Search YouTube metadata, inspect potential source material, and plan your original storytelling.</p><label>Topic / keyword</label><div class="row"><input id="query" placeholder="e.g. Moroccan startups, IA au Maroc"><button id="discover">Search</button><button id="saveTopic" class="secondary">Watch daily</button></div><div class="row"><select id="region" aria-label="Market"><option value="MA">Morocco</option><option value="US">United States</option><option value="FR">France</option><option value="ES">Spain</option></select><select id="language" aria-label="Content language"><option value="ar">Arabic</option><option value="fr">French</option><option value="en">English</option><option value="es">Spanish</option></select><button class="secondary" id="topicRefresh">Saved watches</button></div><div id="results" class="list"></div><div id="savedTopics" class="list"></div></section>
 <section class="card"><h2>02 / Ingest permitted footage</h2><p>Upload a video you own or have permission to edit. Unknown rights stay blocked from unattended rendering.</p><form id="upload"><label>Media file</label><input type="file" id="mediafile" accept="video/*" required><label>Title</label><input name="title" required placeholder="Authorized podcast recording"><div class="grid2"><div><label>Rights</label><select name="rights"><option value="owned">I own this footage</option><option value="licensed">Licensed</option><option value="permission">Permission granted</option><option value="public_domain">Public domain</option><option value="unknown">Unknown / research only</option></select></div><div><label>Proof / source notes</label><input name="evidence" placeholder="Contract, recording, license link"></div></div><button type="submit">Import media</button></form></section>
 <section class="card"><h2>03 / Source library & moments</h2><div class="row"><button class="secondary" id="refresh">Refresh</button><select id="sourceSelect" aria-label="Select a source"></select></div><div class="row"><button id="transcribe" class="secondary">Queue transcription</button><button id="moments">Find moments</button></div><p>Optional speech recognition requires the speech extra in the worker.</p><div id="momentsList" class="list"></div></section>
-<section class="card"><h2>04 / Compose & export</h2><p>Build 15-second highlights, 5-minute explainers, or longer chapters from approved material.</p><label>Clip ranges (seconds)</label><input id="ranges" placeholder="12:27, 38:65"><div class="grid2"><div><label>Canvas</label><select id="format"><option value="vertical">Vertical 9:16</option><option value="horizontal">Horizontal 16:9</option><option value="square">Square 1:1</option></select></div><div><label>Export filename</label><input id="filename" value="clipforge-export.mp4"></div></div><label><input type="checkbox" id="captions" style="width:auto;margin-right:8px"> Burn timestamped captions into export</label><label>Title / creative brief</label><input id="title" placeholder="The idea that changed everything"><button id="queue">Create & queue render</button><div class="notice">Editor V1 creative plans are generated for every render. Cinematic motion execution still requires the original private skill and rendering dependencies.</div></section>
+<section class="card"><h2>04 / Compose & export</h2><p>Build 15-second highlights, 5-minute explainers, or longer chapters from approved material.</p><label>Clip ranges (seconds)</label><input id="ranges" placeholder="12:27, 38:65"><div class="grid2"><div><label>Canvas</label><select id="format"><option value="vertical">Vertical 9:16</option><option value="horizontal">Horizontal 16:9</option><option value="square">Square 1:1</option></select></div><div><label>Export filename</label><input id="filename" value="clipforge-export.mp4"></div></div><label><input type="checkbox" id="captions" style="width:auto;margin-right:8px"> Burn timestamped captions into export</label><label>Title / creative brief</label><input id="title" placeholder="The idea that changed everything"><label>Motion style direction (optional)</label><select id="stylePreset"><option value="">Default editor directions</option></select><p>Curated style prompts guide the private Editor V1 brief; the FFmpeg rough cut does not yet render these effects.</p><button id="queue">Create & queue render</button><div class="notice">Editor V1 creative plans are generated for every render. Cinematic motion execution still requires the original private skill and rendering dependencies.</div></section>
 <section class="card full"><div class="row" style="justify-content:space-between"><h2>05 / Job monitor</h2><button id="jobsRefresh" class="secondary">Refresh jobs</button></div><div id="jobsList" class="list"></div></section>
 </div><p class="foot">ClipForge is an operator-managed production tool. Research metadata is not a license to download or republish third-party content. Publishing integrations require explicit authorized accounts.</p>
 </main><div id="message" role="status"></div>
@@ -51,11 +51,16 @@ function el(tag,text){const n=document.createElement(tag);if(text!==undefined)n.
 function clear(node){while(node.firstChild)node.firstChild.remove()}
 async function refresh(){
  try{
-  const [sources,jobs]=await Promise.all([api("/v1/sources"),api("/v1/jobs")]);
+  const [sources,jobs,atlas]=await Promise.all([api("/v1/sources"),api("/v1/jobs"),api("/v1/styles")]);
   byId("conn").textContent="Connected";byId("sourcecount").textContent=sources.length;
   byId("jobcount").textContent=jobs.length;
   clear(byId("sourceSelect"));
   sources.forEach(s=>{const opt=el("option",s.id+" — "+s.title+" ("+s.rights+")");opt.value=s.id;byId("sourceSelect").append(opt)});
+  const presetSelector=byId("stylePreset"),previous=presetSelector.value;
+  clear(presetSelector);
+  const defaultOption=el("option","Default editor directions");defaultOption.value="";presetSelector.append(defaultOption);
+  atlas.styles.forEach(s=>{const opt=el("option",s.name+" / "+s.family);opt.value=s.id;presetSelector.append(opt)});
+  if(Array.from(presetSelector.options).some(opt=>opt.value===previous))presetSelector.value=previous;
   showJobs(jobs);
  }catch(e){byId("conn").textContent="Connection failed";say(e.message,true)}
 }
@@ -159,7 +164,8 @@ byId("queue").onclick=async()=>{
    return {start:parts[0],end:parts[1]}
   });
   const body={source_id:sid,ranges:spans,format:byId("format").value,
-              output_name:byId("filename").value,title:byId("title").value,captions:byId("captions").checked};
+              output_name:byId("filename").value,title:byId("title").value,captions:byId("captions").checked,
+              style_preset:byId("stylePreset").value||null};
   let p=await api("/v1/plans",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   let j=await api("/v1/plans/"+p.id+"/queue",{method:"POST"});
   say("Render queued — plan #"+p.id+", job #"+j.job_id);refresh()
