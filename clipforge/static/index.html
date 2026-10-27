@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ClipForge AI — Media Operations</title>
+<style>
+:root{color-scheme:dark;--bg:#070d13;--panel:#101923;--border:#273443;--muted:#94a6ba;--text:#f1f7fb;--cyan:#47e3c3;--blue:#61aaff;--warn:#ffc47c}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:radial-gradient(ellipse at 80% -15%,#173547 0%,transparent 55%),var(--bg);color:var(--text);line-height:1.5}
+header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding:20px max(22px,5vw);gap:20px;flex-wrap:wrap}
+.brand{font-weight:850;letter-spacing:.05em;font-size:21px}.brand span{color:var(--cyan)}.tag{border:1px solid #386356;color:var(--cyan);padding:5px 11px;border-radius:999px;font-size:12px}
+main{max-width:1400px;margin:auto;padding:25px 24px 90px}.hero{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;margin-bottom:26px}
+h1{font-size:clamp(26px,3vw,44px);letter-spacing:-.04em;line-height:1.1;margin:8px 0}h2{margin:0 0 14px;font-size:20px}p{color:var(--muted);margin:6px 0 18px}small,.muted{color:var(--muted)}
+.layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:20px}.card{padding:23px;border-radius:16px;border:1px solid var(--border);background:linear-gradient(160deg,rgba(19,32,43,.95),rgba(12,20,29,.98));min-width:0;box-shadow:0 12px 30px #0002}
+.card.full{grid-column:1/-1}input,select,textarea,button{font:inherit;border-radius:9px}input,select,textarea{width:100%;color:var(--text);background:#0b141e;border:1px solid #344454;padding:11px 12px;outline:none;margin:4px 0 11px}
+input:focus,textarea:focus,select:focus{border-color:var(--cyan)}label{font-weight:600;font-size:12px;color:#b7c9da}textarea{min-height:86px;resize:vertical}
+button{cursor:pointer;padding:11px 16px;border:1px solid #4a6a65;background:#234841;color:white;font-weight:700;white-space:nowrap}
+button:hover{background:#2e6156}button.secondary{background:#182a39;border-color:#32465d}button:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row>*{min-width:0}.row input{flex:1}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.metric{background:#0d1721;border:1px solid var(--border);padding:14px;border-radius:10px}.metric strong{display:block;font-size:28px;color:var(--cyan)}
+pre{white-space:pre-wrap;word-break:break-word;color:#b8e2ec;max-height:350px;overflow:auto;font-size:12px;padding:14px;background:#07131a;border:1px solid #233641;border-radius:10px}
+.list{display:grid;gap:10px;max-height:370px;overflow:auto}.item{border:1px solid var(--border);padding:12px;border-radius:10px;background:#0c1620}.item strong{display:block}.item .row{justify-content:space-between}.item small{display:block}.controls{display:flex;gap:8px;flex-wrap:wrap}
+.notice{padding:12px 14px;background:#162a2b;border-left:3px solid var(--cyan);margin-top:14px;border-radius:6px;color:#cceee7}
+#message{position:fixed;bottom:16px;right:16px;max-width:440px;background:#193b34;border:1px solid #438d7e;border-radius:12px;padding:13px 16px;display:none;z-index:10;box-shadow:0 15px 40px #0009}
+code{color:#8fd1ff}.foot{font-size:12px;margin-top:30px;text-align:center}
+@media(max-width:800px){.layout{grid-template-columns:1fr}.card.full{grid-column:auto}.grid2{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}main{padding:16px}.card{padding:16px}}
+</style></head>
+<body><header><div class="brand">CLIP<span>FORGE</span> <small>AI / STUDIO</small></div><div class="row"><span class="tag">LOCAL OPERATOR CONSOLE</span><span id="conn" class="muted">Not connected</span></div></header>
+<main><div class="hero"><div><small>DISCOVER • RESEARCH • EDIT • RENDER</small><h1>Your media production control room.</h1><p>Moroccan and international content. One timeline, multiple formats.</p></div><div><label for="token">API access token</label><div class="row"><input type="password" id="token" placeholder="CLIPFORGE_API_TOKEN" autocomplete="off"><button id="connect">Connect</button></div></div></div>
+<div class="stats"><div class="metric"><small>Sources</small><strong id="sourcecount">—</strong></div><div class="metric"><small>Jobs</small><strong id="jobcount">—</strong></div><div class="metric"><small>Renderer</small><strong>16:9 / 9:16</strong></div></div>
+<div class="layout" style="margin-top:20px">
+<section class="card"><h2>01 / Topic intelligence</h2><p>Search YouTube metadata, inspect potential source material, and plan your original storytelling.</p><label>Topic / keyword</label><div class="row"><input id="query" placeholder="e.g. Moroccan startups, IA au Maroc"><button id="discover">Search</button></div><div id="results" class="list"></div></section>
+<section class="card"><h2>02 / Ingest permitted footage</h2><p>Upload a video you own or have permission to edit. Unknown rights stay blocked from unattended rendering.</p><form id="upload"><label>Media file</label><input type="file" id="mediafile" accept="video/*" required><label>Title</label><input name="title" required placeholder="Authorized podcast recording"><div class="grid2"><div><label>Rights</label><select name="rights"><option value="owned">I own this footage</option><option value="licensed">Licensed</option><option value="permission">Permission granted</option><option value="public_domain">Public domain</option><option value="unknown">Unknown / research only</option></select></div><div><label>Proof / source notes</label><input name="evidence" placeholder="Contract, recording, license link"></div></div><button type="submit">Import media</button></form></section>
+<section class="card"><h2>03 / Source library & moments</h2><div class="row"><button class="secondary" id="refresh">Refresh</button><select id="sourceSelect" aria-label="Select a source"></select></div><div class="row"><button id="transcribe" class="secondary">Queue transcription</button><button id="moments">Find moments</button></div><p>Optional speech recognition requires the speech extra in the worker.</p><div id="momentsList" class="list"></div></section>
+<section class="card"><h2>04 / Compose & export</h2><p>Build 15-second highlights, 5-minute explainers, or longer chapters from approved material.</p><label>Clip ranges (seconds)</label><input id="ranges" placeholder="12:27, 38:65"><div class="grid2"><div><label>Canvas</label><select id="format"><option value="vertical">Vertical 9:16</option><option value="horizontal">Horizontal 16:9</option><option value="square">Square 1:1</option></select></div><div><label>Export filename</label><input id="filename" value="clipforge-export.mp4"></div></div><label>Title / creative brief</label><input id="title" placeholder="The idea that changed everything"><button id="queue">Create & queue render</button><div class="notice">Editor V1 creative plans are generated for every render. Cinematic motion execution still requires the original private skill and rendering dependencies.</div></section>
+<section class="card full"><div class="row" style="justify-content:space-between"><h2>05 / Job monitor</h2><button id="jobsRefresh" class="secondary">Refresh jobs</button></div><div id="jobsList" class="list"></div></section>
+</div><p class="foot">ClipForge is an operator-managed production tool. Research metadata is not a license to download or republish third-party content. Publishing integrations require explicit authorized accounts.</p>
+</main><div id="message" role="status"></div>
+<script>
+(function(){
+const byId=id=>document.getElementById(id);
+let secret=sessionStorage.getItem("clipforge_api_token")||"";
+byId("token").value=secret;
+function say(message,bad){let box=byId("message");box.textContent=message;box.style.borderColor=bad?"#ff7272":"#438d7e";box.style.display="block";setTimeout(()=>box.style.display="none",5000)}
+async function api(path,options){
+  if(!secret)throw Error("Enter the server API token first");
+  options=options||{};
+  options.headers=Object.assign({Authorization:"Bearer "+secret},options.headers||{});
+  const res=await fetch(path,options);
+  if(!res.ok){const raw=await res.text();let msg=raw;try{msg=JSON.parse(raw).detail||raw}catch(e){}throw Error(String(msg).slice(0,300))}
+  if(options.binary)return res.blob();
+  return res.json();
+}
+function el(tag,text){const n=document.createElement(tag);if(text!==undefined)n.textContent=String(text);return n}
+function clear(node){while(node.firstChild)node.firstChild.remove()}
+async function refresh(){
+ try{
+  const [sources,jobs]=await Promise.all([api("/v1/sources"),api("/v1/jobs")]);
+  byId("conn").textContent="Connected";byId("sourcecount").textContent=sources.length;
+  byId("jobcount").textContent=jobs.length;
+  clear(byId("sourceSelect"));
+  sources.forEach(s=>{const opt=el("option",s.id+" — "+s.title+" ("+s.rights+")");opt.value=s.id;byId("sourceSelect").append(opt)});
+  showJobs(jobs);
+ }catch(e){byId("conn").textContent="Connection failed";say(e.message,true)}
+}
+function showJobs(jobs){
+ let root=byId("jobsList");clear(root);
+ if(!jobs.length){root.append(el("small","No background jobs yet."));return}
+ jobs.forEach(j=>{
+  const box=el("div");box.className="item";
+  box.append(el("strong","#"+j.id+" "+j.kind.toUpperCase()+" • "+j.status));
+  box.append(el("small","Target "+j.target_id+" • attempts "+j.attempts+" • "+j.created_at));
+  if(j.error)box.append(el("small","Error: "+j.error));
+  if(j.kind==="render"&&j.status==="complete"){
+   let b=el("button","Download video");b.className="secondary";b.onclick=async()=>{
+    try{
+     let blob=await api("/v1/plans/"+j.target_id+"/download",{binary:true});
+     let url=URL.createObjectURL(blob),link=el("a");link.href=url;link.download="clipforge-"+j.target_id+".mp4";link.click();setTimeout(()=>URL.revokeObjectURL(url),3000)
+    }catch(e){say(e.message,true)}
+   };box.append(b)
+  }
+  root.append(box);
+ })
+}
+byId("connect").onclick=()=>{secret=byId("token").value.trim();sessionStorage.setItem("clipforge_api_token",secret);refresh()};
+byId("refresh").onclick=refresh;
+byId("jobsRefresh").onclick=refresh;
+byId("discover").onclick=async()=>{
+ try{
+  const q=byId("query").value.trim();if(!q)return;
+  const result=await api("/v1/discover?q="+encodeURIComponent(q)+"&max_results=10");
+  const root=byId("results");clear(root);
+  if(!result.length)root.append(el("small","No results."));
+  result.forEach(x=>{
+   const box=el("div");box.className="item";box.append(el("strong",x.title));box.append(el("small",x.channel+" • "+x.published_at));
+   const link=el("a","View original on YouTube");link.href=x.url;link.target="_blank";link.rel="noopener noreferrer";link.style.color="#61aaff";box.append(link);root.append(box)
+  })
+ }catch(e){say(e.message,true)}
+};
+byId("upload").onsubmit=async e=>{
+ e.preventDefault();
+ try{
+  const file=byId("mediafile").files[0];if(!file)throw Error("Choose a video file");
+  const f=new FormData(e.target);f.append("file",file);
+  const result=await api("/v1/media/upload",{method:"POST",body:f});
+  say("Imported source #"+result.id);e.target.reset();await refresh()
+ }catch(err){say(err.message,true)}
+};
+byId("transcribe").onclick=async()=>{
+ try{const sid=Number(byId("sourceSelect").value);if(!sid)throw Error("Choose a source");
+ const j=await api("/v1/sources/"+sid+"/transcribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"small"})});
+ say("Transcription queued as job #"+j.job_id);refresh()}catch(e){say(e.message,true)}
+};
+byId("moments").onclick=async()=>{
+ try{
+  const sid=Number(byId("sourceSelect").value);if(!sid)throw Error("Choose a source");
+  const arr=await api("/v1/sources/"+sid+"/moments?duration=60");
+  const root=byId("momentsList");clear(root);
+  if(!arr.length){root.append(el("small","No transcript moments. Import or generate a transcript first."));return}
+  arr.forEach(x=>{
+   const box=el("div");box.className="item";
+   box.append(el("strong","Score "+x.score+" / 100 — "+x.start.toFixed(1)+"s to "+x.end.toFixed(1)+"s"));
+   box.append(el("small",x.text.slice(0,230)));
+   let b=el("button","Use moment");b.className="secondary";b.onclick=()=>{byId("ranges").value=x.start.toFixed(2)+":"+x.end.toFixed(2);byId("title").value=x.text.slice(0,75)};
+   box.append(b);root.append(box)
+  })
+ }catch(e){say(e.message,true)}
+};
+byId("queue").onclick=async()=>{
+ try{
+  const sid=Number(byId("sourceSelect").value);if(!sid)throw Error("Select a source");
+  const spans=byId("ranges").value.split(",").map(v=>v.trim()).filter(Boolean).map(v=>{
+   const parts=v.split(":").map(Number);if(parts.length!==2||parts.some(x=>!Number.isFinite(x)))throw Error("Use ranges like 10:25,30:40");
+   return {start:parts[0],end:parts[1]}
+  });
+  const body={source_id:sid,ranges:spans,format:byId("format").value,
+              output_name:byId("filename").value,title:byId("title").value};
+  let p=await api("/v1/plans",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  let j=await api("/v1/plans/"+p.id+"/queue",{method:"POST"});
+  say("Render queued — plan #"+p.id+", job #"+j.job_id);refresh()
+ }catch(e){say(e.message,true)}
+};
+if(secret)refresh();
+})();
+</script></body></html>

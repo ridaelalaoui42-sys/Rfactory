@@ -64,3 +64,108 @@ def do_render(plan_id:int):
 
 @app.get("/v1/editor-v1/status",dependencies=[Depends(admin)])
 def editor_status():return upstream_status()
+
+
+# v0.2: dashboard, research adapters, uploads, and durable jobs
+import uuid
+from pathlib import Path
+from fastapi import UploadFile, File, Form
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from . import jobs, moments, ytb
+from .render import output_root
+
+@app.get("/", include_in_schema=False)
+def dashboard():
+    return FileResponse(Path(__file__).parent/"static"/"index.html")
+
+@app.get("/v1/sources/{source_id}/moments", dependencies=[Depends(admin)])
+def ranked_moments(source_id: int, duration: int=60, limit: int=10):
+    try: return moments.candidates(source_id,duration,limit)
+    except ValueError as exc: raise HTTPException(400,str(exc))
+
+@app.get("/v1/ytb/status", dependencies=[Depends(admin)])
+def ytb_status(): return {"installed": ytb.shutil.which("ytb") is not None,
+                           "note":"ytb-cli uses unofficial YouTube endpoints"}
+
+@app.get("/v1/ytb/search", dependencies=[Depends(admin)])
+def ytb_search(q: str, limit: int=10):
+    try: return ytb.search(q,limit)
+    except (ValueError,RuntimeError) as exc: raise HTTPException(400,str(exc))
+
+class TranscriptImport(BaseModel):
+    video: str
+    language: str | None = None
+
+@app.post("/v1/sources/{source_id}/ytb-transcript", dependencies=[Depends(admin)])
+def ytb_transcript_import(source_id:int, options:TranscriptImport):
+    if not storage.source(source_id):raise HTTPException(404,"Source not found")
+    try:
+        cues=ytb.transcript(options.video, options.language)
+        return {"count":storage.import_transcript(source_id,cues),"provenance":"ytb-cli"}
+    except (ValueError,RuntimeError) as exc:raise HTTPException(400,str(exc))
+
+@app.post("/v1/media/upload", dependencies=[Depends(admin)])
+def upload_media(file:UploadFile=File(...), title:str=Form(...),
+                 rights:str=Form("unknown"), evidence:str=Form("")):
+    if rights not in ("owned","licensed","permission","public_domain","unknown","fair_use_review"):
+        raise HTTPException(400,"Invalid rights status")
+    if not title.strip():raise HTTPException(400,"Title required")
+    extension=Path(file.filename or "").suffix.lower()
+    if extension not in (".mp4",".mov",".mkv",".webm",".m4v"):
+        raise HTTPException(400,"Unsupported file type")
+    root=media_root()
+    root.mkdir(parents=True,exist_ok=True)
+    path=root/(str(uuid.uuid4())+extension)
+    size=0
+    try:
+        with path.open("xb") as destination:
+            while True:
+                chunk=file.file.read(1024*1024)
+                if not chunk:break
+                size+=len(chunk)
+                if size>int(os.getenv("CLIPFORGE_MAX_UPLOAD_MB","1024"))*1024*1024:
+                    raise ValueError("Maximum upload size exceeded")
+                destination.write(chunk)
+        if not size:raise ValueError("Empty media")
+        new=SourceCreate(title=title,local_file=str(path),rights=rights,evidence=evidence)
+        return {"id":storage.create_source(new),"bytes":size}
+    except Exception as exc:
+        path.unlink(missing_ok=True)
+        if isinstance(exc,ValueError):raise HTTPException(413,str(exc))
+        raise
+
+@app.post("/v1/plans/{plan_id}/queue", dependencies=[Depends(admin)])
+def enqueue_render(plan_id:int):
+    try:return {"job_id":jobs.enqueue("render",plan_id)}
+    except ValueError as exc:raise HTTPException(400,str(exc))
+
+class TranscribeOptions(BaseModel):
+    model: str = "small"
+    language: str | None = None
+
+@app.post("/v1/sources/{source_id}/transcribe", dependencies=[Depends(admin)])
+def enqueue_transcript(source_id:int,options:TranscribeOptions):
+    if options.model not in ("tiny","base","small","medium"):
+        raise HTTPException(400,"Invalid model")
+    try:return {"job_id":jobs.enqueue("transcribe",source_id,options.model_dump())}
+    except ValueError as exc:raise HTTPException(400,str(exc))
+
+@app.get("/v1/jobs",dependencies=[Depends(admin)])
+def all_jobs(limit:int=30): return jobs.all_jobs(limit)
+
+@app.get("/v1/jobs/{job_id}",dependencies=[Depends(admin)])
+def job_status(job_id:int):
+    result=jobs.get(job_id)
+    if not result:raise HTTPException(404,"Job not found")
+    return result
+
+@app.get("/v1/plans/{plan_id}/download",dependencies=[Depends(admin)])
+def output_download(plan_id:int):
+    current=storage.plan(plan_id)
+    if not current or current["status"]!="complete" or not current["result_file"]:
+        raise HTTPException(404,"Completed video not found")
+    target=Path(current["result_file"]).resolve()
+    if not target.is_relative_to(output_root()) or not target.is_file():
+        raise HTTPException(404,"Output file missing")
+    return FileResponse(target,filename=target.name,media_type="video/mp4")
