@@ -1,3 +1,0 @@
-# Optional. Install only if using Google Gemini services.
--r requirements.txt
-google-genai>=2.25.0,<4

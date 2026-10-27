@@ -1,44 +1,13 @@
-# Working local API deployment. Uses SQLite today; PostgreSQL migration
-# and a separate web/Playwright worker are NOT implemented in this release.
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    restart: unless-stopped
+    build: .
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      RFACTORY_API_TOKEN: ${RFACTORY_API_TOKEN:?Set a strong RFACTORY_API_TOKEN in your environment}
-      SQLITE_DB_PATH: /app/storage/factory.db
-      BROWSER_AUTOMATION_ENABLED: "false"
-      LIVE_PUBLISH_ENABLED: "false"
-      RFACTORY_AI_ENABLED: ${RFACTORY_AI_ENABLED:-false}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      RFACTORY_AI_DAILY_CALL_LIMIT: ${RFACTORY_AI_DAILY_CALL_LIMIT:-20}
+      CLIPFORGE_API_TOKEN: ${CLIPFORGE_API_TOKEN:?Set a strong CLIPFORGE_API_TOKEN in your environment}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
     volumes:
-      - rfactory_data:/app/storage
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=3)"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
+      - ./data:/app/data
+      - ./media:/app/media:ro
+      - ./out:/app/out
     restart: unless-stopped
-    command: ["python", "-m", "scripts.daemon_worker", "--poll-seconds", "4"]
-    environment:
-      SQLITE_DB_PATH: /app/storage/factory.db
-      BROWSER_AUTOMATION_ENABLED: "false"
-      LIVE_PUBLISH_ENABLED: "false"
-      RFACTORY_AI_ENABLED: ${RFACTORY_AI_ENABLED:-false}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      RFACTORY_AI_DAILY_CALL_LIMIT: ${RFACTORY_AI_DAILY_CALL_LIMIT:-20}
-    volumes:
-      - rfactory_data:/app/storage
-
-volumes:
-  rfactory_data:

@@ -1,27 +1,10 @@
-FROM python:3.11-slim
-
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
+FROM python:3.12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg libglib2.0-0 libgl1 \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt requirements-ai.txt ./
-RUN pip install --no-cache-dir -r requirements-ai.txt
-
-COPY services ./services
-COPY scripts ./scripts
-COPY apps/studio ./apps/studio
-COPY storage/assets ./storage/assets
-
-RUN useradd --create-home --uid 10001 rfactory \
-    && mkdir -p /app/storage \
-    && chown -R rfactory:rfactory /app
-USER rfactory
-
-EXPOSE 8000
-
-CMD ["sh", "-c", "python -m scripts.bootstrap_factory && exec uvicorn services.api.server:app --host 0.0.0.0 --port 8000"]
+COPY pyproject.toml README.md ./
+COPY clipforge ./clipforge
+RUN pip install --no-cache-dir .
+RUN useradd -m clipforge && mkdir -p /app/data /app/media /app/out && chown -R clipforge:clipforge /app
+USER clipforge
+ENV CLIPFORGE_DB_PATH=/app/data/clipforge.sqlite3 CLIPFORGE_MEDIA_ROOT=/app/media CLIPFORGE_OUTPUT_ROOT=/app/out
+CMD ["uvicorn","clipforge.api:app","--host","0.0.0.0","--port","8000"]

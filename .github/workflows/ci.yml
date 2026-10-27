@@ -1,81 +1,20 @@
-name: Rfactory code quality and render smoke
-
+name: ClipForge CI
 on:
   push:
-    branches:
-      - main
-      - codex/rfactory-3-advanced-engine
-    paths:
-      - .github/workflows/ci.yml
-      - services/**
-      - tests/**
-      - scripts/**
-      - apps/studio/**
-      - requirements*.txt
-      - Dockerfile
-      - docker-compose.yml
+    branches: [main]
   pull_request:
-
-concurrency:
-  group: rfactory-ci-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-
 jobs:
-  python:
+  tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: pip
-      - name: Install runtime dependencies
-        run: pip install -r requirements-dev.txt
-      - name: Verify modern Gemini SDK integration can initialize without network calls
-        run: |
-          pip install -r requirements-ai.txt
-          python -c "from google import genai; client = genai.Client(api_key='ci-test-placeholder'); assert hasattr(client, 'interactions'); client.close()"
-      - name: Check browser script syntax and PWA manifest
-        run: |
-          node --check apps/studio/app.js
-          python -m json.tool apps/studio/manifest.webmanifest > /dev/null
-      - name: Verify local Docker Compose has API + worker services
-        env:
-          RFACTORY_API_TOKEN: ci-test-example-token
-        run: |
-          docker compose config --quiet
-          docker compose config --services | grep -qx api
-          docker compose config --services | grep -qx worker
-      - name: Verify premium asset image-generation CLI has a no-cost dry-run
-        run: |
-          python -m scripts.generate_art_library --dry-run --category animals --count 3 > /tmp/rfactory_art_plan.json
-          grep -q 'snow leopard' /tmp/rfactory_art_plan.json
-      - name: Install video codec tools
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg
-          ffmpeg -version | head -1
-          ffprobe -version | head -1
-      - name: Check Python syntax
-        run: python -m compileall -q services tests scripts
-      - name: Run complete self-contained test suite
-        run: python -m unittest discover -s tests -v
-      - name: Verify bootstrap does not need release database
-        run: python -m scripts.bootstrap_factory
-      - name: Verify actual offline batch CLI
-        run: python -m scripts.run_batch --count 2 --duration 2 --template ALL
-      - name: Render a real 1080x1920 MP4 and validate it
-        run: python -m scripts.smoke_render
-      - name: Preserve playable sample Reels for PR review
-        uses: actions/upload-artifact@v4
-        with:
-          name: rfactory-sample-reels
-          path: |
-            storage/renders/**/*.mp4
-            storage/renders/**/*_thumb.png
-          if-no-files-found: error
-          retention-days: 7
+          python-version: "3.12"
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install ClipForge
+        run: python -m pip install -e ".[dev]"
+      - name: Run automated tests
+        run: python -m pytest -q
