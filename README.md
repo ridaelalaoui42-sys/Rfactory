@@ -64,7 +64,7 @@ Burning source-aligned captions is available through the dashboard / API. Every 
 
 ## Atlas-inspired motion-style briefs
 
-Choose from 18 original motion-style direction presets inspired by the public Futurepedia Style Atlas (catalog: 86 styles). `GET /v1/styles` lists available IDs and `GET /v1/styles/{style_id}` returns output-specific design directions. Include optional `style_preset` in `POST /v1/plans` to embed the direction in the Editor V1 JSON handoff after rendering. These are **creative briefs, not rendered effects**; original Futurepedia prompts/sound kits and the private Editor V1 skill are not bundled. See [docs/STYLE_ATLAS.md](docs/STYLE_ATLAS.md).
+Choose from 18 original motion-style direction presets inspired by the public Futurepedia Style Atlas (catalog: 86 styles). `GET /v1/styles` lists available IDs, `GET /v1/styles/{style_id}` returns design directions, and `POST /v1/styles/prompt` generates a structured original animation prompt. Include optional `style_preset` in `POST /v1/plans` to embed the direction in the Editor V1 JSON handoff after rendering. These are **creative briefs, not rendered effects**; original Futurepedia prompts/sound kits and the private Editor V1 skill are not bundled. See [docs/STYLE_ATLAS.md](docs/STYLE_ATLAS.md).
 
 ## Boundaries
 
