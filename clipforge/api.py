@@ -21,6 +21,20 @@ def health():return {"status":"ok","service":"clipforge","version":"0.2.0"}
 @app.get("/v1/formats",dependencies=[Depends(admin)])
 def formats():return {name:{"width":dims[0],"height":dims[1]} for name,dims in FORMATS.items()}
 
+@app.get("/v1/styles",dependencies=[Depends(admin)])
+def style_catalog():
+    from .style_atlas import list_styles, FAMILY_COUNTS
+    styles=list_styles()
+    return {"styles":styles,"supported_presets":len(styles),
+            "atlas_total_styles":sum(FAMILY_COUNTS.values()),
+            "notice":"Original creative briefs; full Atlas source prompts are not bundled"}
+
+@app.get("/v1/styles/{style_id}",dependencies=[Depends(admin)])
+def style_detail(style_id:str,output_format:str="vertical"):
+    from .style_atlas import style_brief
+    try:return style_brief(style_id,output_format)
+    except ValueError as exc:raise HTTPException(404,str(exc))
+
 @app.get("/v1/sources",dependencies=[Depends(admin)])
 def sources():return storage.sources()
 
