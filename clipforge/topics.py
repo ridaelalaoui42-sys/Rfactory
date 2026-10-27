@@ -91,6 +91,9 @@ def scan_due(limit:int=2):
     if not os.getenv("YOUTUBE_API_KEY"):return []
     init()
     with storage.connect() as db:
+        cap=int(os.getenv("CLIPFORGE_DISCOVERY_MAX_QUERIES_PER_DAY","20"))
+        used=db.execute("SELECT COUNT(*) AS n FROM discovery_events WHERE created_at>=datetime('now','-1 day')").fetchone()["n"]
+        if used>=max(1,min(cap,100)):return []
         ids=[r["id"] for r in db.execute("""SELECT id FROM topic_watches
             WHERE enabled=1 AND next_scan <= CURRENT_TIMESTAMP
             ORDER BY next_scan LIMIT ?""",(max(1,min(4,limit)),))]
