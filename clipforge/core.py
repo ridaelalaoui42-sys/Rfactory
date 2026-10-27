@@ -38,6 +38,7 @@ class EditPlan(BaseModel):
     format: Literal["vertical","horizontal","square"]
     output_name: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*\.mp4$")
     title: str = ""
+    captions: bool = False
     @model_validator(mode="after")
     def max_duration(self):
         if sum(r.end-r.start for r in self.ranges)>14400: raise ValueError("Four-hour output limit")

@@ -3,15 +3,32 @@ services:
     build: .
     ports:
       - "127.0.0.1:8000:8000"
-    environment:
-      CLIPFORGE_API_TOKEN: ${CLIPFORGE_API_TOKEN:?Set a strong CLIPFORGE_API_TOKEN in your environment}
+    environment: &defaults
+      CLIPFORGE_API_TOKEN: ${CLIPFORGE_API_TOKEN:?Set a strong CLIPFORGE_API_TOKEN}
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
-    volumes:
-      - clipforge_data:/app/data
-      - ./media:/app/media:ro
-      - clipforge_out:/app/out
+      CLIPFORGE_DB_PATH: /app/data/clipforge.sqlite3
+      CLIPFORGE_MEDIA_ROOT: /app/media
+      CLIPFORGE_OUTPUT_ROOT: /app/out
+    volumes: &shared
+      - cf_db:/app/data
+      - cf_media:/app/media
+      - cf_output:/app/out
     restart: unless-stopped
-
+  worker:
+    build: .
+    command: ["python","-m","clipforge.worker"]
+    environment:
+      <<: *defaults
+      CLIPFORGE_YOUTUBE_OAUTH_JSON: /run/secrets/youtube-oauth.json
+      CLIPFORGE_META_PAGE_TOKEN: ${CLIPFORGE_META_PAGE_TOKEN:-}
+      CLIPFORGE_META_GRAPH_VERSION: ${CLIPFORGE_META_GRAPH_VERSION:-}
+    volumes:
+      - cf_db:/app/data
+      - cf_media:/app/media
+      - cf_output:/app/out
+      - ./secrets:/run/secrets:ro
+    restart: unless-stopped
 volumes:
-  clipforge_data:
-  clipforge_out:
+  cf_db:
+  cf_media:
+  cf_output:

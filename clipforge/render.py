@@ -4,6 +4,7 @@ from pathlib import Path
 from .core import FORMATS, EditPlan, render_allowed, safe_local
 from .storage import source,plan as get_plan,plan_status
 from .editorv1 import brief
+from .captions import srt
 
 def media_root():return Path(os.getenv("CLIPFORGE_MEDIA_ROOT","./media")).expanduser().resolve()
 def output_root():return Path(os.getenv("CLIPFORGE_OUTPUT_ROOT","./out")).expanduser().resolve()
@@ -65,7 +66,21 @@ def render(plan_id:int):
             result=temp/"assembled.mp4"
             command(["ffmpeg","-v","error","-y","-f","concat","-safe","0",
                      "-i",str(playlist),"-c","copy","-movflags","+faststart",str(result)])
-            shutil.copyfile(result,target)
+            if spec.captions:
+                captions=srt(spec.source_id,spec.ranges)
+                if not captions.strip():
+                    raise ValueError("Captions requested but this source has no timed transcript")
+                subtitle=temp/"captions.srt"
+                subtitle.write_text(captions,encoding="utf-8")
+                fontsize=32 if spec.format=="vertical" else 26
+                bottom=100 if spec.format=="vertical" else 45
+                style=f"FontName=Noto Sans,FontSize={fontsize},Outline=2,Shadow=1,Alignment=2,MarginV={bottom}"
+                filterarg=f"subtitles={subtitle}:force_style='{style}'"
+                command(["ffmpeg","-v","error","-y","-i",str(result),
+                         "-vf",filterarg,"-c:v","libx264","-preset","veryfast",
+                         "-crf","21","-c:a","copy","-movflags","+faststart",str(target)])
+            else:
+                shutil.copyfile(result,target)
         jsonfile=brief(spec,src,target.with_suffix(".editor-v1.json"))
         plan_status(plan_id,"complete",result_file=str(target))
         return {"status":"complete","path":str(target),"editor_v1_brief":str(jsonfile),

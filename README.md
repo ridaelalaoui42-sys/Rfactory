@@ -1,47 +1,71 @@
-# ClipForge AI
+# ClipForge AI — Automated Media Production Studio
 
-Autonomous-media foundation for Moroccan and international content, with a rights-aware research and editing pipeline.
+ClipForge AI builds vertical (9:16) and horizontal (16:9) videos from authorized media. It combines YouTube discovery, transcript indexing, high-moment candidate ranking, FFmpeg rendering, timed captions, and a private Editor V1 creative workflow.
 
-## Working first release
-- YouTube Data API metadata search; local transcript indexing and timestamp search.
-- Persistent SQLite sources, transcripts and editing plans with rights gate.
-- Multi-segment rendering using FFmpeg for vertical (9:16), horizontal (16:9) or square (1:1).
-- Private original Editor V1 skill detection and JSON editing brief output; **no redistribution of the original skill**.
-- Authenticated FastAPI routes and a CLI. No unattended third-party downloads or automated social posts.
+**Current version:** 0.2 development release. A functioning single-operator dashboard and background worker, not yet a fully automatic social publishing platform.
 
-## Installation
+## Quick start with Docker
 
-Requires Python >= 3.11 and ffmpeg/ffprobe.
+Prerequisites: Docker Engine + Docker Compose plugin. Download or clone this repository.
 
-    pip install -e ".[dev]"
+1. Set a strong random environment secret CLIPFORGE_API_TOKEN (required).
+2. Optionally set YOUTUBE_API_KEY for official YouTube Data API search.
+3. Start: docker compose up --build
+4. Visit http://127.0.0.1:8000, enter the configured API token.
+5. Upload footage you own or are authorized to use, and save rights evidence.
+6. Import a timestamped transcript or run optional on-device transcription.
+7. Select candidate moments, export format and optional burned subtitles.
+8. Queue the render; the worker produces MP4 and an Editor V1 creative brief.
+
+To use faster-whisper in Docker, build a worker image with the optional speech extra installed. In a Python environment, run: python -m pip install -e ".[speech]". Default Docker installation intentionally excludes large AI model downloads.
+
+## Python local mode
+
+Requires Python 3.11+, FFmpeg and FFprobe.
+
+    python -m pip install -e ".[dev]"
     clipforge init
-    export CLIPFORGE_API_TOKEN=your-long-random-secret
+    export CLIPFORGE_API_TOKEN=your-secret
     clipforge serve
 
-API: http://127.0.0.1:8000/docs
-Docker: set CLIPFORGE_API_TOKEN then docker compose up --build.
+In a separate terminal run: python -m clipforge.worker
 
-### Sample authorized workflow
+The API listens only on localhost in local CLI mode. The Docker binding is also localhost-only by default. Use authenticated TLS reverse proxy when hosting elsewhere.
 
-    mkdir -p media
-    cp /your/approved/recording.mp4 media/recording.mp4
-    clipforge add-source --title "Own recording" --local-file media/recording.mp4 --rights owned --evidence "I recorded this"
-    clipforge create-plan --source-id 1 --ranges "0:2,3:5" --format vertical --output short.mp4
+## Research
+
+Official discovery:
+
+    clipforge discover --query "Moroccan entrepreneurship"
+
+The optional independent ytb-cli can search public metadata and timestamped caption tracks, using unofficial YouTube endpoints. This tool is not affiliated with Google and its access methods may be brittle or restricted by YouTube terms. ClipForge does not automatically download YouTube video/audio.
+
+To import a transcript using an approved workflow:
+
+    clipforge add-source --title "My podcast" --rights owned --evidence "Recording contract" --local-file media/podcast.mp4
+    clipforge import-transcript --source-id 1 --json transcript.json
+
+Transcript format is a JSON list with start/end seconds and text fields. ytb-cli transcript research is also available through the authenticated API, but it does not authorize downloading or republishing a source video.
+
+## Scheduled topic watches
+
+In the dashboard, search a topic and select "Watch daily" with a market and language. The Docker worker automatically refreshes pending watches using the official YouTube Data API, stores deduplicated video metadata, and enforces a daily query limit. This research catalog never automatically imports third-party footage for publishing.
+
+API endpoints: POST /v1/topics, GET /v1/topics, GET /v1/topic-results, POST /v1/topics/{id}/scan.
+
+## Render and Editor V1
+
+    clipforge create-plan --source-id 1 --ranges "10:35,46:88" --format vertical --output my-short.mp4
     clipforge render --plan-id 1
 
-Other format: --format horizontal --output episode.mp4. Arbitrary long episodes supported up to 4 hours per render plan.
+Allowed format names: vertical, horizontal and square. Plans support up to 200 segments and 4 hours of assembled output.
 
-To search YouTube metadata, set YOUTUBE_API_KEY and run:
+Burning source-aligned captions is available through the dashboard / API. Every export produces a JSON brief for the separately installed original Editor V1 skill. The original skill is not bundled or resold. Set CLIPFORGE_EDITOR_V1_PATH to its privately installed skill root and use the API prepare-editor-v1 endpoint for approved horizontal outputs. That handoff creates an upstream project workspace; it does not automatically create the final HyperFrames cinematic edit.
 
-    clipforge discover --query "Morocco technology"
+## Boundaries
 
-Transcripts: clipforge import-transcript --source-id 1 --json transcript.json
-JSON list: [{"start":0,"end":2.5,"text":"السلام عليكم","language":"ar"}]
+Not delivered yet: fully autonomous original Editor V1 effects, AI B-roll and full scriptwriting, multi-user SaaS, OAuth account onboarding and live-tested public publishing, a hosted server, or legal copyright/fair-use clearance. Optional private YouTube and draft Facebook upload adapters are implemented but require your authorized credentials and operator approval. Read docs/PUBLISHING.md. Source rights and platform terms are mandatory.
 
-## Current boundaries
-- Short/long **rough-cut editing**, not yet full Editor V1 cinematic effects. Each render emits a .editor-v1.json creative brief for the next layer.
-- Metadata discovery only. Public YouTube availability and fair-use discussion do not independently authorize downloading audiovisual content.
-- Imported source media must be owned, permitted or licensed with evidence. Unreviewed fair use is not an unattended-production permission.
-- Synchronous renders, local storage, no web UI / no social OAuth / no publishing yet. See docs/ROADMAP.md.
+Original Rfactory code and branding assets remain preserved on branch backup/rfactory-before-clipforge-2026-10-27. Read docs/BUILD_PROGRESS.md for current implementation details.
 
-Original Rfactory content is preserved in branch backup/rfactory-before-clipforge-2026-10-27.
+Tests: python -m pytest -q. The GitHub Actions workflow renders synthetic videos for regression coverage.

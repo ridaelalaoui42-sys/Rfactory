@@ -4,12 +4,16 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 from .core import TranscriptItem
 
-def youtube_search(query:str,max_results:int=10,api_key:str|None=None):
+def youtube_search(query:str,max_results:int=10,api_key:str|None=None,region_code:str|None=None,language:str|None=None):
     key=api_key or os.getenv("YOUTUBE_API_KEY")
     if not key:raise ValueError("Set YOUTUBE_API_KEY")
     if not query.strip():raise ValueError("Empty search query")
     qs=urlencode({"part":"snippet","type":"video","q":query,
                   "maxResults":min(max(max_results,1),50),"key":key})
+    if region_code or language:
+        suffix=urlencode({key:value for key,value in
+                          (("regionCode",region_code),("relevanceLanguage",language)) if value})
+        qs=qs+"&"+suffix
     with urlopen("https://www.googleapis.com/youtube/v3/search?"+qs,timeout=15) as r:
         data=json.loads(r.read(1000000))
     return [{"youtube_id":x["id"]["videoId"],
