@@ -62,6 +62,10 @@ Allowed format names: vertical, horizontal and square. Plans support up to 200 s
 
 Burning source-aligned captions is available through the dashboard / API. Every export produces a JSON brief for the separately installed original Editor V1 skill. The original skill is not bundled or resold. Set CLIPFORGE_EDITOR_V1_PATH to its privately installed skill root and use the API prepare-editor-v1 endpoint for approved horizontal outputs. That handoff creates an upstream project workspace; it does not automatically create the final HyperFrames cinematic edit.
 
+## Atlas-inspired motion-style briefs
+
+Choose from 18 original motion-style direction presets inspired by the public Futurepedia Style Atlas (catalog: 86 styles). `GET /v1/styles` lists available IDs, `GET /v1/styles/{style_id}` returns design directions, and `POST /v1/styles/prompt` generates a structured original animation prompt. Include optional `style_preset` in `POST /v1/plans` to embed the direction in the Editor V1 JSON handoff after rendering. These are **creative briefs, not rendered effects**; original Futurepedia prompts/sound kits and the private Editor V1 skill are not bundled. See [docs/STYLE_ATLAS.md](docs/STYLE_ATLAS.md).
+
 ## Boundaries
 
 Not delivered yet: fully autonomous original Editor V1 effects, AI B-roll and full scriptwriting, multi-user SaaS, OAuth account onboarding and live-tested public publishing, a hosted server, or legal copyright/fair-use clearance. Optional private YouTube and draft Facebook upload adapters are implemented but require your authorized credentials and operator approval. Read docs/PUBLISHING.md. Source rights and platform terms are mandatory.

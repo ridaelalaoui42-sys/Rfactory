@@ -21,6 +21,20 @@ def health():return {"status":"ok","service":"clipforge","version":"0.2.0"}
 @app.get("/v1/formats",dependencies=[Depends(admin)])
 def formats():return {name:{"width":dims[0],"height":dims[1]} for name,dims in FORMATS.items()}
 
+@app.get("/v1/styles",dependencies=[Depends(admin)])
+def style_catalog():
+    from .style_atlas import list_styles, FAMILY_COUNTS
+    styles=list_styles()
+    return {"styles":styles,"supported_presets":len(styles),
+            "atlas_total_styles":sum(FAMILY_COUNTS.values()),
+            "notice":"Original creative briefs; full Atlas source prompts are not bundled"}
+
+@app.get("/v1/styles/{style_id}",dependencies=[Depends(admin)])
+def style_detail(style_id:str,output_format:str="vertical"):
+    from .style_atlas import style_brief
+    try:return style_brief(style_id,output_format)
+    except ValueError as exc:raise HTTPException(404,str(exc))
+
 @app.get("/v1/sources",dependencies=[Depends(admin)])
 def sources():return storage.sources()
 
@@ -92,6 +106,22 @@ def ytb_status(): return {"installed": ytb.shutil.which("ytb") is not None,
 def ytb_search(q: str, limit: int=10):
     try: return ytb.search(q,limit)
     except (ValueError,RuntimeError) as exc: raise HTTPException(400,str(exc))
+
+class StylePromptRequest(BaseModel):
+    style_id: str
+    title: str
+    format: str = "vertical"
+    voiceover_script: str = ""
+    duration_seconds: float = 15
+
+@app.post("/v1/styles/prompt",dependencies=[Depends(admin)])
+def compiled_style_prompt(body:StylePromptRequest):
+    from .style_atlas import make_prompt
+    try:
+        return {"prompt": make_prompt(body.style_id,body.format,body.title,
+                                      body.voiceover_script,body.duration_seconds),
+                "note": "Original creative instruction prompt; no render executed"}
+    except ValueError as exc:raise HTTPException(400,str(exc))
 
 class TranscriptImport(BaseModel):
     video: str
