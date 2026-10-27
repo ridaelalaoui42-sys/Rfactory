@@ -16,9 +16,12 @@ def init():
     with storage.connect() as db:db.executescript(DDL)
 
 def enqueue(kind,target_id,payload=None):
-    if kind not in ("render","transcribe") or target_id<1:raise ValueError("Invalid job")
+    if kind not in ("render","transcribe","publish_youtube","publish_facebook") or target_id<1:raise ValueError("Invalid job")
     if kind=="render" and not storage.plan(target_id):raise ValueError("Unknown plan")
     if kind=="transcribe" and not storage.source(target_id):raise ValueError("Unknown source")
+    if kind.startswith("publish_"):
+        from .publishing import approved_media
+        approved_media(target_id,kind.removeprefix("publish_"))
     init()
     with storage.connect() as db:
         db.execute("BEGIN IMMEDIATE")
@@ -59,7 +62,13 @@ def work_once():
     if not task:return None
     try:
         if task["kind"]=="render":data=render(task["target_id"])
-        else:data=transcribe(task["target_id"],**json.loads(task["payload"]))
+        elif task["kind"]=="transcribe":data=transcribe(task["target_id"],**json.loads(task["payload"]))
+        elif task["kind"] in ("publish_youtube","publish_facebook"):
+            from .publishing import youtube_private, facebook_draft
+            kwargs=json.loads(task["payload"])
+            fn=youtube_private if task["kind"]=="publish_youtube" else facebook_draft
+            data=fn(task["target_id"],**kwargs)
+        else:raise ValueError("Unsupported job kind")
         with storage.connect() as db:
             db.execute("UPDATE jobs SET status='complete',result=?,error=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?",
                        (json.dumps(data),task["id"]))

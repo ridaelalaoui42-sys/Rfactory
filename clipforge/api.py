@@ -177,3 +177,30 @@ def prepare_editor_v1(plan_id:int):
     try: return prepare(plan_id)
     except ValueError as exc:raise HTTPException(400,str(exc))
     except RuntimeError as exc:raise HTTPException(409,str(exc))
+
+
+class PublicationRequest(BaseModel):
+    destination: str
+    title: str
+    description: str = ""
+
+class ApprovalRequest(BaseModel):
+    destination: str
+
+@app.post("/v1/plans/{plan_id}/approve-publication", dependencies=[Depends(admin)])
+def approve_publication(plan_id:int,body:ApprovalRequest):
+    from .publishing import approve
+    try:return approve(plan_id,body.destination)
+    except ValueError as exc:raise HTTPException(400,str(exc))
+
+@app.post("/v1/plans/{plan_id}/queue-publish-draft", dependencies=[Depends(admin)])
+def publish_draft(plan_id:int,body:PublicationRequest):
+    if body.destination not in ("youtube","facebook"):
+        raise HTTPException(400,"Unsupported publishing destination")
+    if not body.title.strip():raise HTTPException(400,"Title required")
+    try:
+        jobid=jobs.enqueue("publish_"+body.destination,plan_id,
+                           {"title":body.title,"description":body.description})
+        return {"job_id":jobid,"destination":body.destination,
+                "note":"Destination creates private/draft content only, never public posts"}
+    except ValueError as exc:raise HTTPException(400,str(exc))

@@ -3,7 +3,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-no
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY clipforge ./clipforge
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[publish]"
 RUN useradd -m clipforge && mkdir -p /app/data /app/media /app/out && chown -R clipforge:clipforge /app
 USER clipforge
 ENV CLIPFORGE_DB_PATH=/app/data/clipforge.sqlite3 CLIPFORGE_MEDIA_ROOT=/app/media CLIPFORGE_OUTPUT_ROOT=/app/out
