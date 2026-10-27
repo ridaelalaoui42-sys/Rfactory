@@ -73,3 +73,16 @@ def worker(once=False,interval=2.0):
     if once:return work_once()
     while True:
         if work_once() is None:time.sleep(interval)
+
+
+def fail_stale_jobs(hours: int=8) -> int:
+    """Recover a dead worker's abandoned jobs without silently duplicate-rendering."""
+    if hours<1:raise ValueError("Minimum stale window is one hour")
+    init()
+    with storage.connect() as db:
+        current=db.execute("""UPDATE jobs
+           SET status='failed', error='Worker did not complete; review media before resubmitting',
+           updated_at=CURRENT_TIMESTAMP
+           WHERE status='running' AND updated_at < datetime('now',?)""",
+           (f"-{hours} hours",))
+        return current.rowcount
