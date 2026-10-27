@@ -107,6 +107,22 @@ def ytb_search(q: str, limit: int=10):
     try: return ytb.search(q,limit)
     except (ValueError,RuntimeError) as exc: raise HTTPException(400,str(exc))
 
+class StylePromptRequest(BaseModel):
+    style_id: str
+    title: str
+    format: str = "vertical"
+    voiceover_script: str = ""
+    duration_seconds: float = 15
+
+@app.post("/v1/styles/prompt",dependencies=[Depends(admin)])
+def compiled_style_prompt(body:StylePromptRequest):
+    from .style_atlas import make_prompt
+    try:
+        return {"prompt": make_prompt(body.style_id,body.format,body.title,
+                                      body.voiceover_script,body.duration_seconds),
+                "note": "Original creative instruction prompt; no render executed"}
+    except ValueError as exc:raise HTTPException(400,str(exc))
+
 class TranscriptImport(BaseModel):
     video: str
     language: str | None = None
