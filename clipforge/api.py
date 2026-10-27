@@ -169,3 +169,11 @@ def output_download(plan_id:int):
     if not target.is_relative_to(output_root()) or not target.is_file():
         raise HTTPException(404,"Output file missing")
     return FileResponse(target,filename=target.name,media_type="video/mp4")
+
+
+@app.post("/v1/plans/{plan_id}/prepare-editor-v1", dependencies=[Depends(admin)])
+def prepare_editor_v1(plan_id:int):
+    from .editorv1_project import prepare
+    try: return prepare(plan_id)
+    except ValueError as exc:raise HTTPException(400,str(exc))
+    except RuntimeError as exc:raise HTTPException(409,str(exc))
