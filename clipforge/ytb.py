@@ -32,4 +32,25 @@ def transcript(video,language=None):
     data=call(*args)
     if isinstance(data,dict):data=data.get("segments",data.get("cues",data.get("transcript")))
     if not isinstance(data,list):raise ValueError("Unrecognized ytb transcript format")
-    return normalize_transcript(data)
+    cleaned=[]
+    for cue in data:
+        if not isinstance(cue,dict):continue
+        if "start_ms" in cue or "startMs" in cue:
+            first=float(cue.get("start_ms",cue.get("startMs")))/1000
+            end_ms=cue.get("end_ms",cue.get("endMs"))
+            length_ms=cue.get("duration_ms",cue.get("durationMs"))
+            if end_ms is not None:last=float(end_ms)/1000
+            elif length_ms is not None:last=first+float(length_ms)/1000
+            else:continue
+        else:
+            first=cue.get("start",cue.get("offset"))
+            last=cue.get("end")
+            if last is None and cue.get("duration") is not None and first is not None:
+                last=float(first)+float(cue["duration"])
+        raw=cue.get("text",cue.get("body",cue.get("value","")))
+        if not raw and isinstance(cue.get("runs"),list):
+            raw="".join(str(x.get("text","")) for x in cue["runs"] if isinstance(x,dict))
+        if first is not None and last is not None and str(raw).strip():
+            cleaned.append({"start":first,"end":last,"text":str(raw).strip()})
+    if not cleaned:raise ValueError("No timestamped captions found in ytb result")
+    return normalize_transcript(cleaned)
