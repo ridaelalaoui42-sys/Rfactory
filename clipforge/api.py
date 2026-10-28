@@ -18,6 +18,13 @@ def admin(authorization:str|None=Header(default=None)):
 @app.get("/health")
 def health():return {"status":"ok","service":"clipforge","version":"0.2.0"}
 
+# Optional browsable native style preview; serves only reviewed, local static files.
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path as StylePath
+_style_root = StylePath(__file__).resolve().parent.parent / "visual_style_engine" / "web"
+if _style_root.is_dir():
+    app.mount("/style-engine", StaticFiles(directory=str(_style_root), html=True), name="style-engine")
+
 @app.get("/v1/formats",dependencies=[Depends(admin)])
 def formats():return {name:{"width":dims[0],"height":dims[1]} for name,dims in FORMATS.items()}
 
