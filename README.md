@@ -66,6 +66,22 @@ Burning source-aligned captions is available through the dashboard / API. Every 
 
 Choose from 18 original motion-style direction presets inspired by the public Futurepedia Style Atlas (catalog: 86 styles). `GET /v1/styles` lists available IDs, `GET /v1/styles/{style_id}` returns design directions, and `POST /v1/styles/prompt` generates a structured original animation prompt. Include optional `style_preset` in `POST /v1/plans` to embed the direction in the Editor V1 JSON handoff after rendering. These are **creative briefs, not rendered effects**; original Futurepedia prompts/sound kits and the private Editor V1 skill are not bundled. See [docs/STYLE_ATLAS.md](docs/STYLE_ATLAS.md).
 
+## Executable Visual Style Engine (prototype)
+
+The first original executable style is **Risograph Zine**. Source: [visual_style_engine/](visual_style_engine/docs/README.md). It renders deterministic three-ink procedural frames with synthesized SFX and exports horizontal/vertical/square MP4 files.
+
+Run from the repository root:
+
+```sh
+python -m pip install -r visual_style_engine/requirements-dev.txt
+npm install --prefix visual_style_engine
+python visual_style_engine/scripts/render_style.py --format vertical --width 540 --fps 24 --output out/risograph-demo.mp4
+```
+
+The optional web preview and storyboard are served by ClipForge at `/style-engine/player.html?format=vertical` and `/style-engine/storyboard.html` when the repository's `visual_style_engine/web` directory exists. The preview is separate from the FFmpeg footage rough cut; it is **not** private Editor V1 cinematic rendering.
+
+Only **one** native style is implemented; the other Atlas-inspired style IDs remain creative-brief-only. No proprietary upstream prompt bundle or privately installed skill is included.
+
 ## Boundaries
 
 Not delivered yet: fully autonomous original Editor V1 effects, AI B-roll and full scriptwriting, multi-user SaaS, OAuth account onboarding and live-tested public publishing, a hosted server, or legal copyright/fair-use clearance. Optional private YouTube and draft Facebook upload adapters are implemented but require your authorized credentials and operator approval. Read docs/PUBLISHING.md. Source rights and platform terms are mandatory.
