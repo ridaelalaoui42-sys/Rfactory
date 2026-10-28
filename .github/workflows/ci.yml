@@ -16,6 +16,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Install ClipForge
         run: python -m pip install -e ".[dev]"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install visual style runtime dependencies
+        run: |
+          npm install --prefix visual_style_engine --no-audit --no-fund
+          python -m pip install -r visual_style_engine/requirements-dev.txt
       - name: Validate Compose configuration
         run: CLIPFORGE_API_TOKEN=ci-test docker compose config -q
       - name: Run automated tests
