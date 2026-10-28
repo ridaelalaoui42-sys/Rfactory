@@ -1,0 +1,8 @@
+{
+  "name": "clipforge-visual-style-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native and browser-capable procedural video style engine",
+  "scripts": {"test": "node scripts/frames.cjs --probe", "preview": "python -m http.server 8765 --directory web"},
+  "dependencies": {"skia-canvas": "^3.0.8"}
+}
