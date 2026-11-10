@@ -234,3 +234,8 @@ def scan_topic(topic_id:int):
     try:return topics.scan(topic_id)
     except ValueError as exc:raise HTTPException(400,str(exc))
     except Exception:raise HTTPException(502,"Topic research failed; check worker logs")
+
+
+# Optional Stickman Director routes use the same bearer-token gate as ClipForge.
+from .stickman_api import router as stickman_router
+app.include_router(stickman_router, dependencies=[Depends(admin)])
