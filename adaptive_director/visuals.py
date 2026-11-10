@@ -158,6 +158,10 @@ def drawing(im,t):
     if p>.4:
         rr(d,(420,1210,720,1355),CITRON,14)
         txt(d,468,1255,'CONTROL',40,INK,True)
+        # an active signal continues to travel even after the circuit is fully traced
+        s=(t*1.2)%1
+        sx=205+(910-205)*s
+        circles(d,sx,1110+26*math.sin(t*2),18,ORANGE)
     # pencil tip moves along current path and lifts on last frame
     if p<1:
         idx=min(len(pts)-2,int(p*(len(pts)-1)))
@@ -174,7 +178,7 @@ def stickman(im,t):
     rr(d,(120,1260,990,1360),INK,25)
     rr(d,(740,1190,932,1260),ORANGE,20)
     txt(d,768,1206,'CLICK',27,PAPER,True)
-    q=ease(clamp((t-.25)/1.9));bounce=24*math.sin(q*math.pi*2)
+    q=ease(clamp((t-.25)/1.9));bounce=24*math.sin(q*math.pi*2)+12*math.sin(t*4.1)
     x,y=430,1030-bounce
     circles(d,x,y-190,118,INK)
     # expressive eyes swap according to reach state
@@ -191,9 +195,11 @@ def stickman(im,t):
     line(d,[(x,y-25),(x+125,y+30),(hand_x,hand_y)],INK,20)
     circles(d,hand_x,hand_y,26,ORANGE)
     if q>.82:
-        for i in range(5):
-            a=i*math.pi/2.5; xx=850+110*math.cos(a+t*3);yy=1200+100*math.sin(a+t*3)
-            circles(d,xx,yy,9,CITRON)
+        for i in range(9):
+            a=i*math.pi/4.5; xx=850+(115+16*math.sin(t*3))*math.cos(a+t*2);yy=1200+(100+16*math.cos(t*3))*math.sin(a+t*2)
+            circles(d,xx,yy,16 if i%2 else 11,CITRON)
+        rings=25+27*(.5+.5*math.sin(t*5))
+        d.ellipse((850-rings,1198-rings,850+rings,1198+rings),outline=PAPER,width=7)
         rr(d,(200,1450,865,1640),CITRON,25)
         txt(d,250,1500,'ACTION > SLIDES',46,INK,True)
         txt(d,253,1577,'anticipation • contact • recoil',23,INK)
