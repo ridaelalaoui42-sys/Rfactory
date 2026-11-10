@@ -69,3 +69,8 @@ Not delivered yet: fully autonomous original Editor V1 effects, AI B-roll and fu
 Original Rfactory code and branding assets remain preserved on branch backup/rfactory-before-clipforge-2026-10-27. Read docs/BUILD_PROGRESS.md for current implementation details.
 
 Tests: python -m pytest -q. The GitHub Actions workflow renders synthetic videos for regression coverage.
+
+
+## Experimental Stickman Director bridge
+
+Rfactory can optionally delegate authored **B1–B4** stickman animation projects to the MIT-licensed [Stickman Video Director](https://github.com/kaomei/stickman-video-director) runtime. A token-protected API registers rights-approved projects, queues previews/renders, verifies explicit preview approval and exposes exports. This is an **optional integration**: it requires an independently installed Node 20+ upstream Skill with its assets/dependencies and is not one-click AI video creation. Exports must be native **1080p or higher**; upstream B1–B4 currently **burn captions** and are not suitable for caption-free reels without a renderer enhancement. Read [installation, API and limitations](docs/STICKMAN_INTEGRATION.md).
