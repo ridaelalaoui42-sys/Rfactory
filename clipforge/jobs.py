@@ -16,9 +16,12 @@ def init():
     with storage.connect() as db:db.executescript(DDL)
 
 def enqueue(kind,target_id,payload=None):
-    if kind not in ("render","transcribe","publish_youtube","publish_facebook") or target_id<1:raise ValueError("Invalid job")
+    if kind not in ("render","transcribe","publish_youtube","publish_facebook","stickman_preview","stickman_render") or target_id<1:raise ValueError("Invalid job")
     if kind=="render" and not storage.plan(target_id):raise ValueError("Unknown plan")
     if kind=="transcribe" and not storage.source(target_id):raise ValueError("Unknown source")
+    if kind.startswith("stickman_"):
+        from . import stickman
+        stickman._resolve(target_id)
     if kind.startswith("publish_"):
         from .publishing import approved_media
         approved_media(target_id,kind.removeprefix("publish_"))
@@ -63,6 +66,11 @@ def work_once():
     try:
         if task["kind"]=="render":data=render(task["target_id"])
         elif task["kind"]=="transcribe":data=transcribe(task["target_id"],**json.loads(task["payload"]))
+        elif task["kind"] in ("stickman_preview","stickman_render"):
+            from . import stickman
+            action="preview" if task["kind"]=="stickman_preview" else "render"
+            payload=json.loads(task["payload"])
+            data=stickman.execute(task["target_id"],action,seconds=payload.get("seconds",20))
         elif task["kind"] in ("publish_youtube","publish_facebook"):
             from .publishing import youtube_private, facebook_draft
             kwargs=json.loads(task["payload"])
