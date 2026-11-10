@@ -1,0 +1,52 @@
+{
+  "topic": "Why AI tools need better animation",
+  "brand": {
+    "width": 1080,
+    "height": 1920,
+    "language": "en",
+    "subtitles": false
+  },
+  "total_seconds": 20,
+  "shots": [
+    {
+      "start": 0,
+      "end": 4,
+      "module": "bang",
+      "focus": "UI demonstration",
+      "source_ids": [],
+      "motion": "cursor+camera"
+    },
+    {
+      "start": 4,
+      "end": 8,
+      "module": "vox",
+      "focus": "source analysis",
+      "source_ids": [],
+      "motion": "investigation-line"
+    },
+    {
+      "start": 8,
+      "end": 12,
+      "module": "huashu",
+      "focus": "living scientific illustration",
+      "source_ids": [],
+      "motion": "procedural-growth"
+    },
+    {
+      "start": 12,
+      "end": 16,
+      "module": "drawing",
+      "focus": "trace mechanisms",
+      "source_ids": [],
+      "motion": "stroke-reveal"
+    },
+    {
+      "start": 16,
+      "end": 20,
+      "module": "stickman",
+      "focus": "human walkthrough",
+      "source_ids": [],
+      "motion": "joint-acting"
+    }
+  ]
+}
