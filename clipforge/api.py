@@ -234,3 +234,8 @@ def scan_topic(topic_id:int):
     try:return topics.scan(topic_id)
     except ValueError as exc:raise HTTPException(400,str(exc))
     except Exception:raise HTTPException(502,"Topic research failed; check worker logs")
+
+
+# Discovery and selection only: never executes third-party animation code.
+from .animation_api import router as animation_router
+app.include_router(animation_router, dependencies=[Depends(admin)])

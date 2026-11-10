@@ -69,3 +69,8 @@ Not delivered yet: fully autonomous original Editor V1 effects, AI B-roll and fu
 Original Rfactory code and branding assets remain preserved on branch backup/rfactory-before-clipforge-2026-10-27. Read docs/BUILD_PROGRESS.md for current implementation details.
 
 Tests: python -m pytest -q. The GitHub Actions workflow renders synthetic videos for regression coverage.
+
+
+## Multi-engine Animation Creative Director (experimental)
+
+An optional animation selector now evaluates content topic, 9:16/16:9 target, duration, caption/voice settings, API budget and renderer capability before recommending Bang Motion, Vox Director, Huashu Art Motion, Stickman Video Director or Claude Drawing assets. **This is a planning/selection layer, not automatic execution of the external skills.** The final encoded reel must meet native 1080p requirements, and unsupported caption-free modes are excluded. See [animation module catalog, API and integration contracts](docs/ANIMATION_MODULES.md).
