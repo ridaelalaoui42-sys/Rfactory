@@ -87,3 +87,32 @@ Maintain a manifest and downloadable output pack with:
 Review Reel view duration/completion, retention hook, shares, saves, follows, meaningful comments and source-link performance. Identify winning **narratives and subject fit**, not repetitive generic visual templates. Run one new storytelling/motion experiment each week.
 
 **Primary references:** [NOAA submarine cables](https://www.noaa.gov/submarine-cables); [ITU submarine cable technical standard](https://www.itu.int/epublications/publication/itu-t-g-971-2024-12-general-features-of-optical-fibre-submarine-cable-systems/en); [FIDO passkeys](https://fidoalliance.org/specifications/); [FTC QR code safety](https://consumer.ftc.gov/consumer-alerts/2026/09/see-qr-code-parked-somewhere-dont-scan-ityet).
+
+
+## 09. Advanced kinetic typography — mandatory Reel quality gate (2026-11-13)
+
+**Owner correction:** The ban applies to word-for-word speech subtitles, **not animated editorial text**. Every Reel must contain meaningful *moving* text integrated into the explanation. A title simply sliding into the same place, fade/scale preset repeated for each sentence, or static word cards is a QA failure.
+
+### Source repertoire (inspect the actual skills before authoring)
+
+- [Bang Motion](https://github.com/bangtutorial/bang-motion) — read `SKILL.md`, `references/techniques.md` and `references/explainer.md`: directional motion blur, glyph/word stagger, highlight shapes and different scene sizes; text must live inside the animated world, not on PPT-style slides. Its browser/GSAP runtime is optional and must be tested before claiming to execute it.
+- [Signal Lab V3](https://github.com/ridaelalaoui42-sys/Rfactory/pull/15) — deterministic, per-frame spring easing, visual motion field, camera/rig, counters and moving data paths. The optional PR is **not** part of production until merged and deployed.
+- [Kinetic Typography skill](https://github.com/iart-ai/kinetic-typography-skills) — optional additional reference for masks, word/character choreography, text-on-path and expressive timeline motion. Read/license-check before incorporating source.
+- [Rfactory Creative Director](https://github.com/ridaelalaoui42-sys/Rfactory/pull/17) — evaluate topic and visual grammar; a planning module is not a tested video renderer.
+
+### Motion-type beat map must be authored **before rendering**
+
+Every text cue needs `start_s`, `end_s`, exact visible English string, scene and narration cue, `attached_to` (visible object/relationship), `animation_family`, `entry/hold/exit`, emphasis and factual source if relevant. Include 8–16 varied semantic text beats in a typical 40-second Reel, without visual clutter. At least three meaningfully different motion families must appear. Available families are **glyph stagger + directional smear; masked reveal/underline draw-on; strike-and-replace; counter-driven geometry; path-following/tethered label; elastic annotation; number rolling; tracked callout and camera push-through**. Avoid uniform text direction in adjacent shots.
+
+Example: GPS explanation labels `NO BARS` and `GPS STILL WORKS` with a strike/reveal, satellite `BROADCAST` with traveling packets, `ARRIVAL DELAY` with a running time marker, `4 SIGNALS` with four links converging, `POSITION SOLVED` with a focal pin, `GPS FIX ≠ MAP` with a split and `DOWNLOAD OFFLINE MAPS` with a drawn highlight. These labels **explain concepts**; they must not be captions duplicating TTS sentences.
+
+### Render + QA
+
+1. Render actual timed animated text tracks, not a storyboard poster or a static layout exported as video. Transparent GIF/video overlays, per-frame Pillow/NumPy composition or a tested Bang Motion/GSAP+browser capture can be used, but the production manifest must accurately identify the renderer that *actually ran*.
+2. Keep native **1080×1920** (or higher), 30 FPS or more for final H.264/AAC. Alpha overlays may have a different internal FPS if time-coded and smoothed on final output. No 720p intermediates upscaled to claim native Full HD.
+3. Test mobile readability and safe areas at **0%, 25%, 50%, 75%, and 100% of each text cue**, plus key transitions. Ensure full words settle for sufficient reading time; verify sharp type, no clipped glyphs, correct nouns/numbers, and correct object tracking.
+4. Inspect final rendered frames, not just mockups; verify TTS/audio sync and a working download URL. Maintain original imagery and source rights. No SRT/VTT, karaoke, or full narrated-sentence transcription.
+5. If the new typography only feels like generic presets, **fail closed**: revise motion design before publishing. Do not publish a title-only substitute.
+6. Before replacing an already-published Reel, inspect recent Page posts. Avoid posting multiple near-duplicates of the same topic simply to replace typography; publication of a revised video is a distinct Page post, not an automatic edit to the previous Reel.
+
+**Reference implementation:** The GPS V2 example built on 2026-11-13 generated six actual transparent animated typography passes with original Pillow scene-graph code and documented Bang/Signal-Lab motion inspiration. Its source and asset ZIP should be retained in the project asset archive; do not claim the full upstream GSAP renderer was executed.
