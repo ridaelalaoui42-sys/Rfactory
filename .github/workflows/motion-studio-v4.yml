@@ -1,0 +1,41 @@
+name: Motion Studio V4 (optional 3D adapter)
+on:
+  pull_request:
+    paths:
+      - "prototypes/motion_studio_v4/**"
+      - ".github/workflows/motion-studio-v4.yml"
+  workflow_dispatch:
+
+jobs:
+  3d-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install FFmpeg and EGL dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libegl1 libgl1 libopengl0
+      - name: Install optional Motion Studio dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r prototypes/motion_studio_v4/requirements-extra.txt pytest
+      - name: 3D animation, layout and SFX regression tests
+        run: python -m pytest -q prototypes/motion_studio_v4/test_studio.py
+      - name: Native 1080x1920 30fps render smoke
+        run: |
+          python prototypes/motion_studio_v4/studio.py --width 1080 --height 1920 --fps 30 --seconds 3.5 --output-dir /tmp/motion-v4
+          python prototypes/motion_studio_v4/qa.py /tmp/motion-v4/CTRL_PULSE_GPS_3D_MOTION_STUDIO_V4.mp4 /tmp/motion-v4/manifest.json
+      - name: Upload rendering evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: motion-v4-smoke
+          path: |
+            /tmp/motion-v4/manifest.json
+            /tmp/motion-v4/qa_report.json
+            /tmp/motion-v4/frames/*.jpg
+          if-no-files-found: ignore
