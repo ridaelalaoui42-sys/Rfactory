@@ -6,6 +6,16 @@ import sys
 import tempfile
 import unittest
 
+# The VTK renderer is an explicitly optional engineering adapter. Main ClipForge
+# CI does not install its large graphics dependencies; run its dedicated CI job.
+try:
+    import vtk  # noqa: F401
+    import numpy  # noqa: F401
+    from PIL import Image  # noqa: F401
+except ImportError:
+    import pytest
+    pytest.skip("Motion Studio V4 requires optional 3D dependencies", allow_module_level=True)
+
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from studio import CUES, DURATION, LabelBox, TextGuard, synth_sounds
 
