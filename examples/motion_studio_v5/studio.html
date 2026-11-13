@@ -1,0 +1,193 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Rfactory Motion Studio / WAN link</title>
+<style>*{box-sizing:border-box}html,body{margin:0;background:#0d1418;overflow:hidden}canvas{display:block;width:1080px;height:1920px}</style></head><body><canvas id="stage" width="1080" height="1920"></canvas><script>
+'use strict';
+/* Rfactory Motion Studio V5 / editorial hybrid demonstration.
+ * Every frame is pure renderAt(time): deterministic, no CSS transitions,
+ * random state, event loops, timers or previous-frame caches.
+ * All source images were generated for the sample; text/diagram/layout are original code.
+ */
+const W=1080,H=1920,D=27.5,FPS=30,TAU=Math.PI*2;
+const C={ink:'#0D1418',navy:'#14262B',paper:'#F5F3EC',orange:'#FF7047',mint:'#79E6CA',white:'#FBFCF8',gray:'#95A7A7',darkgray:'#657A7D',line:'#33444A',red:'#FD624C',gold:'#F2B85B'};
+const canvas=document.getElementById('stage'),g=canvas.getContext('2d',{alpha:false});
+const IM={};const names=['router_beauty','phone_hand','network_diorama','router_macro','phone_product','server_diorama','router_uplink','phone_detailed','network_earth','node_router','node_phone','node_server'];
+window.assetsLoaded=false;
+Promise.all(names.map(n=>new Promise((ok,fail)=>{let im=new Image();im.onload=()=>{IM[n]=im;ok()};im.onerror=fail;im.src='../assets/'+n+'.jpg'}))).then(()=>window.assetsLoaded=true).catch(e=>window.assetError=String(e));
+function clamp(x,a=0,b=1){return Math.max(a,Math.min(b,x))}
+function ease(x){x=clamp(x);return 1-Math.pow(1-x,3)}
+function smooth(x){x=clamp(x);return x*x*(3-2*x)}
+function spring(x){x=clamp(x);return 1-Math.exp(-9*x)*Math.cos(10*x)}
+function local(t,start,end){return clamp((t-start)/(end-start))}
+function path(points,col='#fff',lw=4){g.beginPath();g.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)g.lineTo(...points[i]);g.strokeStyle=col;g.lineWidth=lw;g.stroke()}
+function rr(x,y,w,h,r,fill,stroke,sw=2){g.beginPath();g.roundRect(x,y,w,h,r);if(fill){g.fillStyle=fill;g.fill()}if(stroke){g.strokeStyle=stroke;g.lineWidth=sw;g.stroke()}}
+function text(str,x,y,size=48,color=C.white,weight=700,font='Inter Display',align='left'){g.fillStyle=color;g.textAlign=align;g.textBaseline='alphabetic';g.font=`${weight} ${size}px "${font}", "Inter", sans-serif`;g.fillText(str,x,y)}
+function mono(str,x,y,size=24,color=C.gray,align='left'){g.fillStyle=color;g.textAlign=align;g.textBaseline='alphabetic';g.font=`600 ${size}px "DejaVu Sans Mono",monospace`;g.fillText(str,x,y)}
+function measure(str,size=100,weight=800,font='Inter Display'){g.font=`${weight} ${size}px "${font}",sans-serif`;return g.measureText(str).width}
+function fit(str,maxW,base=110,min=42,weight=800){let s=base;while(s>min&&measure(str,s,weight)>maxW)s-=2;return s}
+function trackingText(str,x,y,size,color,appear,stagger=0.025,weight=800){
+ g.font=`${weight} ${size}px "Inter Display",sans-serif`;g.textAlign='left';g.textBaseline='alphabetic';
+ let w=g.measureText(str).width,space=(str.length-1)*.7,xx=x;
+ const p=clamp(appear);
+ for(let i=0;i<str.length;i++){
+  const ch=str[i],cw=g.measureText(ch).width+.7;
+  const e=spring((p-i*stagger)/(1-i*stagger));
+  if(e>0.001){g.save();g.globalAlpha=Math.min(1,e);g.translate(xx,y+(1-e)*65);g.scale(1,.88+.12*e);g.fillStyle=color;g.fillText(ch,0,0);g.restore()}
+  xx+=cw;
+ }
+ return w+space
+}
+function gradient(x0,y0,x1,y1,c0,c1){const a=g.createLinearGradient(x0,y0,x1,y1);a.addColorStop(0,c0);a.addColorStop(1,c1);return a}
+function bg(t,dark=true,grid=true){
+ const fill=dark?gradient(0,0,W,H,'#0A1419','#12262D'):gradient(0,0,W,H,'#F5F3EC','#E7ECE9');g.fillStyle=fill;g.fillRect(0,0,W,H);
+ if(grid){g.save();g.globalAlpha=dark?.22:.20;g.strokeStyle=dark?'#4D686D':'#A4B4B1';g.lineWidth=1;const phase=Math.sin(t*.3)*15;
+  for(let xx=26;xx<W;xx+=54){g.beginPath();g.moveTo(xx+phase,0);g.lineTo(xx+phase,H);g.stroke()}
+  for(let yy=34;yy<H;yy+=54){g.beginPath();g.moveTo(0,yy);g.lineTo(W,yy);g.stroke()}g.restore()}
+ // controlled corner light, not random particles
+ g.save();g.globalAlpha=dark?.15:.09;const glow=g.createRadialGradient(890,430,0,890,430,660);glow.addColorStop(0,dark?'#2BEAC7':'#FF9048');glow.addColorStop(1,'transparent');g.fillStyle=glow;g.fillRect(300,0,780,1100);g.restore();
+}
+function cropImage(name,x,y,w,h,t=0,zoom=1.0,rad=28,focusX=.5,focusY=.5){
+ const im=IM[name];if(!im)return;
+ const scale=Math.max(w/im.width,h/im.height)*zoom;const sw=w/scale,sh=h/scale;
+ const dx=(im.width-sw)*focusX+Math.sin(t*.28)*12;const dy=(im.height-sh)*focusY+Math.cos(t*.34)*8;
+ g.save();g.shadowColor='rgba(0,0,0,.40)';g.shadowBlur=38;g.shadowOffsetY=15;
+ rr(x,y,w,h,rad,C.ink);g.shadowColor='transparent';g.beginPath();g.roundRect(x,y,w,h,rad);g.clip();g.drawImage(im,clamp(dx,0,im.width-sw),clamp(dy,0,im.height-sh),sw,sh,x,y,w,h);g.restore();
+}
+function frame(t,dark=true,tag='TECH / EXPLAINED',step=1){
+ const fg=dark?C.paper:C.ink;
+ g.save();g.strokeStyle=dark?'#3B5155':'#D0D8D2';g.lineWidth=2;g.beginPath();g.moveTo(64,116);g.lineTo(1016,116);g.stroke();
+ // Echo mark
+ g.strokeStyle=C.orange;g.lineWidth=6;g.beginPath();g.moveTo(64,78);g.lineTo(98,78);g.lineTo(112,59);g.lineTo(128,94);g.lineTo(143,71);g.lineTo(171,71);g.stroke();
+ mono('CTRL',188,85,27,fg);mono('PULSE',290,85,27,C.orange);
+ mono(tag,1014,86,22,dark?'#BFCBC9':'#617374','right');
+ g.fillStyle=dark?'#33454A':'#D8DFD8';g.fillRect(64,1804,952,3);
+ g.fillStyle=C.orange;g.fillRect(64,1804,952*clamp(t/D),3);
+ mono(`0${step} / 06`,65,1850,22,dark?'#AFC2C1':'#5B7070');
+ mono('THE INTERNET IS PHYSICAL',1014,1850,20,dark?'#8EA2A4':'#738486','right');
+ g.restore();
+}
+function panelText(t,start,str,x,y,size,color,delay=.0,stagger=.024){let p=local(t,start+delay,start+delay+1.0);return trackingText(str,x,y,size,color,p,stagger)}
+function label(x,y,word,col=C.mint,dark=true){rr(x,y,176,45,12,dark?'#203337':'#DAE6E1',col,2);mono(word,x+88,y+30,17,col,'center')}
+function pill(x,y,w,h,str,col=C.mint,dark=true){rr(x,y,w,h,h/2,dark?'#182B2F':'#E4EAE6',col,2);mono(str,x+w/2,y+h/2+8,22,col,'center')}
+function lensFlare(x,y,r,a,col=C.mint){g.save();g.globalAlpha=clamp(a);const grad=g.createRadialGradient(x,y,4,x,y,r);grad.addColorStop(0,col);grad.addColorStop(.22,col+'BB');grad.addColorStop(1,'transparent');g.fillStyle=grad;g.beginPath();g.arc(x,y,r,0,TAU);g.fill();g.restore()}
+function packetPath(points,t,start,end,color=C.mint,count=3,width=5,failAt=1){
+ const p=local(t,start,end);
+ g.save();g.lineCap='round';g.lineJoin='round';path(points,color+'50',width);
+ const lengths=[];let total=0;for(let i=1;i<points.length;i++){const l=Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]);lengths.push(l);total+=l}
+ for(let k=0;k<count;k++){
+  const q=((p*.92+k/count)%1)*failAt;if(p<.01)continue;
+  let dist=q*total,at=0;while(at<lengths.length-1&&dist>lengths[at]){dist-=lengths[at];at++}
+  const rat=lengths[at]?dist/lengths[at]:0,x=points[at][0]+(points[at+1][0]-points[at][0])*rat,y=points[at][1]+(points[at+1][1]-points[at][1])*rat;
+  lensFlare(x,y,45,.13,color);g.fillStyle=color;g.beginPath();g.arc(x,y,8,0,TAU);g.fill();
+ }
+ g.restore();
+}
+function wifi(x,y,r,t,alpha=1,color=C.mint){g.save();g.globalAlpha=alpha;g.strokeStyle=color;g.lineWidth=9;g.lineCap='round';for(let j=0;j<3;j++){let rr=r*(.45+j*.27);g.beginPath();g.arc(x,y,rr,Math.PI*1.21,Math.PI*1.79);g.stroke()}
+ g.fillStyle=color;g.beginPath();g.arc(x,y+2,9,0,TAU);g.fill();
+ const rr=r*(.72+local(t,0,1)*.15);g.globalAlpha=.28*alpha;g.strokeStyle=color;g.lineWidth=3;g.beginPath();g.arc(x,y,rr,Math.PI*1.22,Math.PI*1.78);g.stroke();g.restore()}
+function status(x,y,w,k,v,good,dark=true){
+ rr(x,y,w,88,18,dark?'#1A2C31':'#E2E8E3',dark?'#344E52':'#C5D1CA',2);
+ g.fillStyle=good?C.mint:C.orange;g.beginPath();g.arc(x+34,y+43,9,0,TAU);g.fill();
+ mono(k,x+56,y+35,19,dark?'#B3CAC6':'#3A5253');text(v,x+56,y+67,26,dark?C.paper:C.ink,800);
+}
+function curve(x0,y0,x1,y1,col,tt=0,broken=false){
+ g.save();g.lineWidth=6;g.lineCap='round';g.strokeStyle=col;g.setLineDash([13,14]);g.lineDashOffset=-tt*42;
+ g.beginPath();g.moveTo(x0,y0);g.bezierCurveTo(x0+70,y0-72,x1-66,y1-72,x1,y1);
+ if(!broken)g.stroke();else {g.strokeStyle=C.orange;g.stroke();g.save();g.setLineDash([]);g.strokeStyle=C.orange;g.lineWidth=15;const xm=(x0+x1)/2,ym=(y0+y1)/2-53;g.beginPath();g.moveTo(xm-25,ym-25);g.lineTo(xm+25,ym+25);g.moveTo(xm+25,ym-25);g.lineTo(xm-25,ym+25);g.stroke();g.restore()}
+ g.restore()
+}
+function shot0(t){
+ bg(t,true,false);frame(t,true,'THE PUZZLE',1);
+ panelText(t,0,'FULL BARS',67,320,122,C.paper);
+ panelText(t,.5,'NO INTERNET',67,451,104,C.orange,.0,.018);
+ cropImage('phone_hand',72,568+Math.sin(t*.66)*8,936,920,t,1.075,33,.49,.47);
+ // Deliberately set apart: signal icon is attached to the displayed device.
+ wifi(774,1114,120,t,.93,C.mint);
+ const strength=local(t,0.4,1.4);
+ for(let j=0;j<5;j++){
+  const bh=26+j*21,x=160+j*39;
+  rr(x,1580-bh,24,bh,6,j/5<strength?C.mint:'#3A5152');
+ }
+ mono('STRONG LOCAL SIGNAL',164,1664,24,C.paper);
+ if(t>1.45){let q=local(t,1.45,2.2);g.save();g.globalAlpha=q;g.fillStyle=C.orange;g.font='900 88px "Inter Display", sans-serif';g.fillText('≠',784,1658);g.restore()}
+}
+function shot1(t){
+ bg(t,false);frame(t,false,'THE FIRST LINK',2);
+ panelText(t,3.55,'WHAT BARS',63,290,118,C.ink);
+ panelText(t,4.14,'ACTUALLY MEAN',63,407,95,C.orange);
+ cropImage('router_beauty',68,540+Math.sin(t*.6)*7,944,920,t,1.05,32,.51,.5);
+ // The phone and router can communicate, not the wider web.
+ wifi(294,985,140,t,.7,C.mint);
+ g.save();g.strokeStyle=C.orange;g.lineWidth=13;g.beginPath();g.moveTo(66,475);g.lineTo(66+944*smooth(local(t,5.0,6.25)),475);g.stroke();g.restore();
+ status(70,1510,940,'PHONE TO WI-FI ROUTER','CONNECTED',true,false);
+}
+function shot2(t){
+ bg(t,true);frame(t,true,'LOCAL NETWORK',3);
+ panelText(t,7.65,'LINK ONE',67,301,130,C.paper);
+ panelText(t,8.15,'STILL WORKS',67,422,97,C.mint);
+ cropImage('network_diorama',68,555,944,914,t,1.015,38,.48,.5);
+ packetPath([[125,1235],[340,1050],[522,1160]],t,8.4,11.2,C.mint,5,5,1);
+ lensFlare(530,1150,82,.22,C.mint);
+ status(68,1510,944,'WI-FI / PHONE TO ROUTER','GOOD SIGNAL',true,true);
+}
+function shot3(t){
+ bg(t,false);frame(t,false,'THE SECOND LINK',4);
+ panelText(t,11.5,'LINK TWO',68,310,123,C.ink);
+ panelText(t,12.0,'BREAKS',68,432,128,C.orange);
+ cropImage('router_uplink',68,552,944,935,t,1.04,32,.54,.49);
+ // The cable is an authored visual prop; fake packet ring is explicitly an illustration.
+ const p=smooth(local(t,12.55,13.4));g.save();g.lineWidth=10;g.strokeStyle=C.orange;g.lineCap='round';g.beginPath();g.moveTo(190,1290);g.bezierCurveTo(360,1180,590,1180,795,1260);g.stroke();g.restore();
+ if(p>.2){lensFlare(620,1230,155,.22+p*.20,C.orange);g.save();g.globalAlpha=p;g.lineWidth=10;g.strokeStyle=C.orange;path([[586,1191],[649,1259]],C.orange,11);path([[649,1188],[589,1254]],C.orange,11);g.restore()}
+ status(68,1520,944,'ROUTER TO PROVIDER','CONNECTION LOST',false,false);
+}
+function shot4(t){
+ bg(t,true);frame(t,true,'FOLLOW THE PACKETS',5);
+ panelText(t,16.0,'TWO DIFFERENT',68,308,102,C.paper);
+ panelText(t,16.48,'CONNECTIONS',68,425,119,C.orange);
+ // Independent generated image cutouts from 3-up board, composited as purposeful nodes.
+ const p=local(t,16.6,17.3),a=[['node_phone',74,700],['node_router',382,700],['node_server',690,700]];
+ for(let i=0;i<a.length;i++){
+  const [name,x,y]=a[i];g.save();g.globalAlpha=clamp((p-i*.20)*1.6);
+  const bob=14*Math.sin(t*2.6+i*1.1);
+  cropImage(name,x,y+bob,272,360,t,1.015,19,.5,.49);g.restore();
+  mono(['PHONE','ROUTER','PROVIDER'][i],x+136,1110,22,C.paper,'center');
+ }
+ curve(306,1145,421,1145,C.mint,t,false);curve(650,1145,733,1145,C.orange,t,true);
+ // Animated packets on the first part of the path; terminated at uplink.
+ packetPath([[310,1143],[360,1115],[420,1143]],t,17.2,21.65,C.mint,4,7,1);
+ // Keep the last beat alive: router continues serving local devices as the
+ // upstream link visibly retries and fails; the failed path never lights green.
+ const retry=22+Math.sin(t*7)*10;
+ lensFlare(642,1145,retry*2,.2,C.orange);
+ g.save();g.globalAlpha=.5+.3*Math.sin(t*6);
+ g.strokeStyle=C.orange;g.lineWidth=5;g.beginPath();g.arc(683,1130,36+Math.abs(Math.sin(t*3))*34,-.8,.9);g.stroke();g.restore();
+ status(72,1340,440,'LOCAL / WI-FI','CONNECTED',true,true);
+ status(568,1340,440,'UPSTREAM / WAN','OFFLINE',false,true);
+ rr(72,1580,936,82,18,'#193239');mono('FULL BARS CAN COEXIST WITH NO INTERNET',540,1632,22,C.paper,'center');
+}
+function shot5(t){
+ bg(t,false);frame(t,false,'THE TAKEAWAY',6);
+ panelText(t,21.65,'CHECK THE',67,299,125,C.ink);
+ panelText(t,22.12,'WAN STATUS',67,435,130,C.orange);
+ cropImage('router_macro',76,530+Math.sin(t*.3)*6,928,915,t,1.065,35,.48,.42);
+ // Device is physically where troubleshooting begins: UI pointer tracks the status LED.
+ const p=smooth(local(t,23.2,23.95));g.save();g.strokeStyle=C.mint;g.lineWidth=5;g.globalAlpha=p;g.beginPath();g.arc(290,1280,46+10*Math.sin(t*6),0,TAU);g.stroke();
+ path([[335,1290],[490,1430],[940,1430]],C.mint,5);g.restore();
+ const end=local(t,23.8,24.65);g.save();g.globalAlpha=end;
+ rr(66,1510,948,166,24,'#152A2D');text('FULL WI-FI',98,1576,61,C.paper,850);text('≠',558,1592,76,C.orange,900);text('INTERNET',635,1576,56,C.mint,850);
+ mono('START AT YOUR ROUTER, THEN CHECK THE PROVIDER',103,1636,20,C.paper);
+ g.restore();
+}
+function cut(t){
+ // only a short motivated impact at a scene boundary, not a repeated preset transition
+ for(const x of [3.5,7.65,11.5,16.0,21.65]){
+  const d=t-x;if(d>=0&&d<.15){g.save();g.globalAlpha=(1-d/.15)*.53;g.fillStyle=C.paper;g.fillRect(0,0,W,H);g.restore();break;}
+ }
+}
+window.renderAt=function(t){
+ if(!window.assetsLoaded)throw Error('Media not loaded '+window.assetError);
+ t=clamp(Number(t)||0,0,D-1/FPS);
+ g.clearRect(0,0,W,H);
+ if(t<3.5)shot0(t);else if(t<7.65)shot1(t);else if(t<11.5)shot2(t);else if(t<16.0)shot3(t);else if(t<21.65)shot4(t);else shot5(t);
+ cut(t);
+ return {time:t,frame:Math.round(t*FPS)};
+};
+</script></body></html>
