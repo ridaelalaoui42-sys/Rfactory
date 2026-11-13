@@ -24,10 +24,24 @@ TAU=2*math.pi
 INK=(7,13,22); SLATE=(18,28,40); PAPER=(240,245,241)
 CORAL=(255,137,82); ICE=(112,227,239); MINT=(183,241,202)
 MUTED=(136,155,168)
-FONT_DISPLAY='/usr/share/fonts/opentype/inter/InterDisplay-Black.otf'
-FONT_MEDIUM='/usr/share/fonts/opentype/inter/Inter/InterDisplay-Medium.otf'
-if not os.path.exists(FONT_MEDIUM):FONT_MEDIUM='/usr/share/fonts/opentype/inter/InterDisplay-Medium.otf'
-FONT_MONO='/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf'
+# Resolve the licensed system Inter typeface in containers/Ubuntu CI without
+# bundling or redistributing font files. A missing editorial font fails closed.
+def _inter_font(style, local):
+    if os.path.isfile(local):
+        return local
+    try:
+        resolved = subprocess.check_output(
+            ['fc-match', '-f', '%{file}', 'Inter:style=' + style],
+            text=True, timeout=5).strip()
+    except (FileNotFoundError, subprocess.SubprocessError):
+        resolved = ''
+    if os.path.isfile(resolved) and 'inter' in resolved.lower():
+        return resolved
+    raise RuntimeError('Inter font is missing; install the OS fonts-inter package')
+
+FONT_DISPLAY = _inter_font('Black', '/usr/share/fonts/opentype/inter/InterDisplay-Black.otf')
+FONT_MEDIUM = _inter_font('Medium', '/usr/share/fonts/opentype/inter/InterDisplay-Medium.otf')
+FONT_MONO = '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf'
 
 
 def clamp(v,a=0.,b=1.):return min(b,max(a,v))
