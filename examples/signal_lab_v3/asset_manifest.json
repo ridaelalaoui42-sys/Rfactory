@@ -1,0 +1,117 @@
+{
+  "project": "CTRL PULSE / Signal Lab V3",
+  "reference": {
+    "file": "64102.mp4",
+    "seconds": 31.978667,
+    "resolution": "1920x1080",
+    "fps": 60,
+    "note": "Inspiration only; footage not copied into demo"
+  },
+  "creative_direction": "Editorial paper-craft kinetic collage + procedural scene graph + source-backed documentary images",
+  "brand": {
+    "forest_ink": "#142A23",
+    "paper": "#F6F0DD",
+    "signal_orange": "#FB5F37",
+    "citron": "#DCF15F",
+    "electric_blue": "#4D67F4",
+    "rose": "#F58B94"
+  },
+  "assets": [
+    {
+      "name": "editorial_mascot_and_objects",
+      "path": "assets/sprite_sheet.png",
+      "kind": "generated illustration",
+      "rights": "AI-generated illustration; fictional",
+      "in_demo": true
+    },
+    {
+      "name": "NASA Blue Marble 2012",
+      "source_url": "https://www.jpl.nasa.gov/images/pia18033-earth/",
+      "hosted_url": "https://res.cloudinary.com/dlopg0jmq/image/upload/v1794267183/ctrl_pulse/engine_v3/nasa_blue_marble.jpg",
+      "kind": "real NASA scientific image",
+      "credit": "NASA/NOAA/GSFC/Suomi NPP/VIIRS/Norman Kuring",
+      "license": "NASA public-use guidelines; review usage and avoid implying endorsement",
+      "in_demo": "hosted final version only"
+    },
+    {
+      "name": "NERSC servers photo",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Front_of_server_racks_at_NERSC.jpg",
+      "kind": "real photo",
+      "license": "CC0 1.0",
+      "credit": "Derrick Coetzee",
+      "in_demo": false,
+      "status": "discovered and licensing verified; source download blocked (429)"
+    },
+    {
+      "name": "English narration",
+      "kind": "HeyGen TTS",
+      "url": "https://resource2.heygen.ai/text_to_speech/bb23d023009e40cb8f4c70310afac860/a3a4aa242aaf431ea8ec2c4b3bb332fa/id=d451319504a542a1ba044c058af734ea.wav",
+      "voice": "Wade",
+      "duration_s": 25.4429705
+    },
+    {
+      "name": "NASA Supercomputer corridor 2015",
+      "source_url": "https://www.nas.nasa.gov/SC15/demos/demo33.html",
+      "hosted_url": "https://res.cloudinary.com/dlopg0jmq/image/upload/v1794267809/ctrl_pulse/engine_v3/nasa_supercomputer.jpg",
+      "kind": "real NASA government photo",
+      "credit": "NASA Center for Climate Simulation",
+      "rights": "NASA media use guidelines and proper credit",
+      "in_demo": "hosted composite 0.1\u20131.8s"
+    }
+  ],
+  "shots": [
+    {
+      "start": 0,
+      "end": 4.5,
+      "motion": "kinetic text + chaotic dots + live audio-waveform + parallax laptop"
+    },
+    {
+      "start": 4.5,
+      "end": 8.1,
+      "motion": "spring-rigged mascot + packet trajectories + signal reveal"
+    },
+    {
+      "start": 8.1,
+      "end": 12.55,
+      "motion": "planet orbital tracking + source-backed image insert + moving data dots"
+    },
+    {
+      "start": 12.55,
+      "end": 17.0,
+      "motion": "real procedural-code reveal + moving chip + frame counter"
+    },
+    {
+      "start": 17.0,
+      "end": 21.25,
+      "motion": "180 particles mathematically converge to brand C symbol"
+    },
+    {
+      "start": 21.25,
+      "end": 25.6,
+      "motion": "logo drawn by geometric motion + sequential CTA typography"
+    }
+  ],
+  "safety": "All factual media sourced with rights notes. Synthetic sprites not presented as real photographic evidence. No unlicensed website video footage.",
+  "composite": {
+    "renderer": "Cloudinary video transformations",
+    "destination": "1080x1920 (scaled from true 720x1280 60fps procedural frames)",
+    "layers": [
+      "NASA supercomputer 0.1-1.8s",
+      "NASA Earth 8.15-10.15s",
+      "original SFX score at approx -16 dB",
+      "HeyGen English voice at nominal gain"
+    ],
+    "locally_rendered_master": "CTRL_PULSE_SIGNAL_LAB_V3_720x1280_60fps_silent.mp4"
+  },
+  "final_video": {
+    "url": "https://res.cloudinary.com/dlopg0jmq/video/upload/v1794268407/ctrl_pulse/engine_v3/Signal_Lab_V3_FINAL_1080x1920.mp4",
+    "duration_s": 25.6,
+    "resolution": "1080x1920",
+    "fps": 60,
+    "audio": "HeyGen English TTS + original score",
+    "real_web_assets": [
+      "NASA supercomputer photo",
+      "NASA Blue Marble image"
+    ]
+  }
+}

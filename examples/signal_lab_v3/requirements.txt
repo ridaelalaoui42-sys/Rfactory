@@ -1,0 +1,3 @@
+numpy>=1.24
+Pillow>=10
+# ffmpeg and ffprobe must be installed on the host
