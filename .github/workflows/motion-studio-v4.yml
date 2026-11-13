@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  3d-smoke:
+  render_smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 22
     steps:
